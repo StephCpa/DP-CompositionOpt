@@ -1,0 +1,59 @@
+{
+  "metadata": {
+    "simulator": "p3_softmax_sim.py",
+    "dataset": "synthetic_multiclass_softmax_l1",
+    "n_clients": 20,
+    "samples_per_client": 40,
+    "d": 8,
+    "n_classes": 3,
+    "rounds": 80,
+    "topk_frac": 0.1,
+    "Bh": 1.0,
+    "C0": 1.5,
+    "Cg": 1.5,
+    "Br": 2.0,
+    "Be": 2.0,
+    "epsilon": 8.0,
+    "delta_dp": 1e-05,
+    "accountant": "without_replacement_bound",
+    "participation_rate": 1.0,
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "note": "synthetic small-scale smoke evidence; not a final utility claim"
+  },
+  "three_seed_summary": {
+    "nonprivate_EControl_TopK": {
+      "objective_mean": 0.6284,
+      "objective_sd": 0.0187,
+      "accuracy_mean": 0.7969,
+      "accuracy_sd": 0.013,
+      "sigma": 0.0,
+      "sensitivity": 0.1,
+      "bits_per_client": 5920
+    },
+    "centralDP_EControl_TopK": {
+      "objective_mean": 1.079,
+      "objective_sd": 0.1374,
+      "accuracy_mean": 0.623,
+      "accuracy_sd": 0.0106,
+      "sigma": 0.62,
+      "sensitivity": 0.1,
+      "bits_per_client": 5920
+    },
+    "centralDP_dense_DA": {
+      "objective_mean": 1.6615,
+      "objective_sd": 0.1774,
+      "accuracy_mean": 0.5517,
+      "accuracy_sd": 0.0114,
+      "sigma": 0.93,
+      "sensitivity": 0.15,
+      "bits_per_client": 71040
+    }
+  },
+  "gradient_check": {
+    "max_abs_error": 1e-07
+  }
+}

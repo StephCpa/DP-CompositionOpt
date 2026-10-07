@@ -1,0 +1,24 @@
+{
+  "metadata": {"simulator":"p3_bounded_sim.py (temporary sigma override; no mainline code change)","accountant":"without_replacement_bound with accountant_q=1 (no subsampling amplification)","n_clients":100,"d":20,"rounds":10,"epsilon":8.0,"delta_dp":1e-5,"seed":0,"C0":1.0,"topk_frac":0.1},
+  "q1": [
+    {"Bs":0.25,"objective":0.814880,"accuracy":0.4870,"sigma":1.096012,"sensitivity":0.5,"bits_per_client":7400,"mean_prefix_clip_residual":0.14287,"tail_prefix_clip_residual":0.17227},
+    {"Bs":0.5,"objective":1.074172,"accuracy":0.4873,"sigma":2.192024,"sensitivity":1.0,"bits_per_client":7400,"mean_prefix_clip_residual":0.10071,"tail_prefix_clip_residual":0.16373},
+    {"Bs":1.0,"objective":1.749021,"accuracy":0.4865,"sigma":4.384048,"sensitivity":2.0,"bits_per_client":7400,"mean_prefix_clip_residual":0.02931,"tail_prefix_clip_residual":0.14299},
+    {"Bs":2.0,"objective":3.331652,"accuracy":0.4793,"sigma":8.768095,"sensitivity":4.0,"bits_per_client":7400,"mean_prefix_clip_residual":0.0,"tail_prefix_clip_residual":0.0},
+    {"Bs":5.0,"objective":8.308048,"accuracy":0.4728,"sigma":21.920238,"sensitivity":10.0,"bits_per_client":7400,"mean_prefix_clip_residual":0.0,"tail_prefix_clip_residual":0.0}
+  ],
+  "q05": [
+    {"Bs":0.25,"objective":0.796125,"accuracy":0.4630,"sigma":1.096012,"sensitivity":0.5,"bits_per_client":3700,"mean_prefix_clip_residual":0.14413,"tail_prefix_clip_residual":0.16925},
+    {"Bs":0.5,"objective":0.999003,"accuracy":0.4635,"sigma":2.192024,"sensitivity":1.0,"bits_per_client":3700,"mean_prefix_clip_residual":0.10540,"tail_prefix_clip_residual":0.14974},
+    {"Bs":1.0,"objective":1.547052,"accuracy":0.4645,"sigma":4.384048,"sensitivity":2.0,"bits_per_client":3700,"mean_prefix_clip_residual":0.03814,"tail_prefix_clip_residual":0.12197},
+    {"Bs":2.0,"objective":2.876882,"accuracy":0.4570,"sigma":8.768095,"sensitivity":4.0,"bits_per_client":3700,"mean_prefix_clip_residual":0.0,"tail_prefix_clip_residual":0.0},
+    {"Bs":5.0,"objective":7.146018,"accuracy":0.4470,"sigma":21.920238,"sensitivity":10.0,"bits_per_client":3700,"mean_prefix_clip_residual":0.0,"tail_prefix_clip_residual":0.0}
+  ],
+  "q02": [
+    {"Bs":0.25,"objective":0.904485,"accuracy":0.3583,"sigma":1.096012,"sensitivity":0.5,"bits_per_client":1480,"mean_prefix_clip_residual":0.14327,"tail_prefix_clip_residual":0.16092},
+    {"Bs":0.5,"objective":1.228278,"accuracy":0.3610,"sigma":2.192024,"sensitivity":1.0,"bits_per_client":1480,"mean_prefix_clip_residual":0.09696,"tail_prefix_clip_residual":0.13018},
+    {"Bs":1.0,"objective":2.024053,"accuracy":0.3605,"sigma":4.384048,"sensitivity":2.0,"bits_per_client":1480,"mean_prefix_clip_residual":0.02146,"tail_prefix_clip_residual":0.09258},
+    {"Bs":2.0,"objective":3.892141,"accuracy":0.3518,"sigma":8.768095,"sensitivity":4.0,"bits_per_client":1480,"mean_prefix_clip_residual":0.0,"tail_prefix_clip_residual":0.0},
+    {"Bs":5.0,"objective":9.733473,"accuracy":0.3465,"sigma":21.920238,"sensitivity":10.0,"bits_per_client":1480,"mean_prefix_clip_residual":0.0,"tail_prefix_clip_residual":0.0}
+  ]
+}
