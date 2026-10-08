@@ -1,6 +1,6 @@
 # Reproducibility drivers
 
-Run the following seven commands from the repository root to regenerate the
+Run the following nine commands from the repository root to regenerate the
 committed diagnostic outputs:
 
 ```bash
@@ -36,7 +36,25 @@ python repro/generate_sign_stress.py \
 
 python repro/state_margin_probe.py \
   --output experiments/state_margin_probe_20261008.json
+
+python repro/quadratic_certificate_search.py \
+  --output experiments/quadratic_certificate_20261008.json
+
+python repro/eta_gain_probe.py \
+  --output experiments/eta_gain_scan_20261008.json
 ```
+
+The last two commands are the eta stability audit documented in
+`docs/p3_eta_stability_audit_zh.md`. `quadratic_certificate_search.py` (about
+2.5 minutes) reports the closed-form EC-matrix stability threshold
+`eta_crit = (1/sqrt(1-k/d) - 1)/2` and searches block-scalar quadratic Lyapunov
+certificates with an S-procedure; every reported certificate is re-verified by
+an eigenvalue check, and a certificate that is not found is not evidence of
+instability. `eta_gain_probe.py` (about 40 seconds) records finite-trace gains
+of the unprojected EControl recursion, an eta sweep on the box-LS simulator with
+`B_e = inf`, noise-calibrated gamma and per-client Top-K support logging, and an
+h-projection stress test with `||u|| < B_h`. These are empirical diagnostics,
+not certificates.
 
 The `audit_telescoping.py` command uses `--rounds 40` because that is the
 round count in the committed artifact. Its default is 80, which is useful for

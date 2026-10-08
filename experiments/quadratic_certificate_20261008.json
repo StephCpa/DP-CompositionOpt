@@ -1,0 +1,316 @@
+{
+  "metadata": {
+    "script": "repro/quadratic_certificate_search.py",
+    "kappa_topk_fraction": 0.1,
+    "eta_critical_closed_form": 0.02704627669472992,
+    "eta_critical_check": {
+      "rho_at_crit_minus_1e-4": 0.9999028046974892,
+      "rho_at_crit_plus_1e-4": 1.000097536595459
+    },
+    "eta_paper3": 0.01803085112981993,
+    "recursion": "code convention, no projection: e'=(1-eta)e+q-delta; delta'=(1+eta)(delta-q)+eta^2 e+du",
+    "gain_definition": "steady-state sup bound per unit sup||u_{t+1}-u_t||; quadratic gains also bound RMS values; transient from delta_0=u_0 excluded",
+    "quadratic_constraints": [
+      "<q, delta-q> = 0",
+      "||delta-q||^2 <= (1-kappa)||delta||^2"
+    ],
+    "sector_constraint": "<p, (h_raw-u) - p> >= 0 for the h-ball projection residual p; valid when ||u_t|| <= B_h",
+    "search": "deterministic Nelder-Mead over block-scalar P and S-procedure multipliers; bisection on rho (12 steps in [0.9, 1.2])",
+    "certificate_validity": "every reported certificate is re-verified: P > 0, multipliers >= 0, max eigenvalue < -1e-9 (rho search) or <= 1e-9 * matrix scale after a 1e-7 relative margin on c (gain certificate)",
+    "not_found_meaning": "the heuristic search found no certificate; this is NOT a proof that none exists and NOT evidence of instability",
+    "numpy": "2.5.3",
+    "python": "3.13.16"
+  },
+  "rows": [
+    {
+      "eta": 0.1,
+      "ec_matrix": {
+        "eta": 0.1,
+        "rho": 1.0927658980070194,
+        "stable": false,
+        "e_gain": null,
+        "h_gain": null
+      },
+      "quadratic": {
+        "found": true,
+        "rho": 1.039892578125,
+        "rho_uncertified_below": 1.0398193359374999,
+        "verified": true,
+        "max_eigenvalue": -0.03707553093729091,
+        "params": [
+          1.512360011601046,
+          89.45168151609255,
+          25.927616445770965,
+          92.39738465136107
+        ]
+      },
+      "quadratic_sector": {
+        "found": true,
+        "rho": 1.1078613281249998,
+        "rho_uncertified_below": 1.1077880859375,
+        "verified": true,
+        "max_eigenvalue": -0.06241963095147049,
+        "params": [
+          2.2886766073104003,
+          29.374625075102426,
+          47.743228242918605,
+          0.06511565187489085,
+          71.32277942876306
+        ]
+      },
+      "quadratic_gains": null
+    },
+    {
+      "eta": 0.05,
+      "ec_matrix": {
+        "eta": 0.05,
+        "rho": 1.0269420623167018,
+        "stable": false,
+        "e_gain": null,
+        "h_gain": null
+      },
+      "quadratic": {
+        "found": true,
+        "rho": 0.9963134765625001,
+        "rho_uncertified_below": 0.9962402343750002,
+        "verified": true,
+        "max_eigenvalue": -0.0003531763214256018,
+        "params": [
+          0.787915970670135,
+          364.865970764366,
+          14.786018500126517,
+          394.3081448077545
+        ]
+      },
+      "quadratic_sector": {
+        "found": true,
+        "rho": 1.1250732421875,
+        "rho_uncertified_below": 1.125,
+        "verified": true,
+        "max_eigenvalue": -0.18361616516865528,
+        "params": [
+          0.02039532105392473,
+          19.04101279044782,
+          0.09910998060804758,
+          26.350548548602106,
+          69.09717803860484
+        ]
+      },
+      "quadratic_gains": {
+        "rho": 0.9981567382812501,
+        "e_gain": 5399.281485208655,
+        "h_gain": 390.5971462700556,
+        "c": 107066.60903226145,
+        "mu_e": 0.9971616178393317,
+        "beta": 0.005248324018039385,
+        "P": [
+          [
+            1.0,
+            0.9211257600054301
+          ],
+          [
+            0.9211257600054301,
+            298.9282688930823
+          ]
+        ],
+        "lambda_q_orth": 15.848840774903053,
+        "lambda_contraction": 320.2300954431825,
+        "verification": {
+          "dissipation_max_eigenvalue": -9.811630395261403e-10,
+          "dissipation_matrix_scale": 106767.68076336836,
+          "h_bound_max_eigenvalue": -2.0722544725550168e-19,
+          "passed": true
+        }
+      }
+    },
+    {
+      "eta": 0.027,
+      "ec_matrix": {
+        "eta": 0.027,
+        "rho": 0.9999549785658609,
+        "stable": true,
+        "e_gain": 400169.42926890875,
+        "h_gain": 21609.14918052107
+      },
+      "quadratic": {
+        "found": true,
+        "rho": 0.9810791015625,
+        "rho_uncertified_below": 0.9810058593750001,
+        "verified": true,
+        "max_eigenvalue": -0.010621825854401022,
+        "params": [
+          0.7915585153857558,
+          1336.7000615030347,
+          374.17505338000205,
+          1235.962419906243
+        ]
+      },
+      "quadratic_sector": {
+        "found": true,
+        "rho": 1.0922607421875,
+        "rho_uncertified_below": 1.0921874999999999,
+        "verified": true,
+        "max_eigenvalue": -0.13421671603060709,
+        "params": [
+          -0.2205788671550749,
+          61.32984477468373,
+          152.8359241120791,
+          1.9933235052260692,
+          189.91712177157277
+        ]
+      },
+      "quadratic_gains": {
+        "rho": 0.98675537109375,
+        "e_gain": 1442.465767858112,
+        "h_gain": 58.32341749554516,
+        "c": 54656.84172339441,
+        "mu_e": 0.9982729694976641,
+        "beta": 0.0016376669517419076,
+        "P": [
+          [
+            1.0,
+            1.2644129644568078
+          ],
+          [
+            1.2644129644568078,
+            925.7162178224521
+          ]
+        ],
+        "lambda_q_orth": 124.39718101886032,
+        "lambda_contraction": 921.1035584893805,
+        "verification": {
+          "dissipation_max_eigenvalue": -1.2315903478402425e-08,
+          "dissipation_matrix_scale": 53731.12550557196,
+          "h_bound_max_eigenvalue": -5.260897368130705e-19,
+          "passed": true
+        }
+      }
+    },
+    {
+      "eta": 0.018,
+      "ec_matrix": {
+        "eta": 0.018,
+        "rho": 0.9932010579212216,
+        "stable": true,
+        "e_gain": 3070.631013747378,
+        "h_gain": 110.54271649490559
+      },
+      "quadratic": {
+        "found": true,
+        "rho": 0.9846679687500002,
+        "rho_uncertified_below": 0.9845947265625001,
+        "verified": true,
+        "max_eigenvalue": -0.004370390123330072,
+        "params": [
+          -0.020709207864216875,
+          2240.427165028368,
+          16.187864514024994,
+          2412.920656272742
+        ]
+      },
+      "quadratic_sector": {
+        "found": true,
+        "rho": 1.0877197265624998,
+        "rho_uncertified_below": 1.087646484375,
+        "verified": true,
+        "max_eigenvalue": -0.13571361938177645,
+        "params": [
+          -0.2011637207031407,
+          47.3248274609855,
+          16.820499102966114,
+          57.38814410250208,
+          149.09532905079647
+        ]
+      },
+      "quadratic_gains": {
+        "rho": 0.9862011718750001,
+        "e_gain": 1480.930410141691,
+        "h_gain": 41.540152344233434,
+        "c": 60104.8084226032,
+        "mu_e": 0.9999412300126924,
+        "beta": 0.0007868508016894965,
+        "P": [
+          [
+            1.0,
+            0.3360140982322659
+          ],
+          [
+            0.3360140982322659,
+            1921.1417150719203
+          ]
+        ],
+        "lambda_q_orth": 104.6972687179028,
+        "lambda_contraction": 2006.498610441442,
+        "verification": {
+          "dissipation_max_eigenvalue": -3.807342332716781e-09,
+          "dissipation_matrix_scale": 58183.66670753128,
+          "h_bound_max_eigenvalue": -5.887730982343436e-20,
+          "passed": true
+        }
+      }
+    },
+    {
+      "eta": 0.0135,
+      "ec_matrix": {
+        "eta": 0.0135,
+        "rho": 0.9921409500683941,
+        "stable": true,
+        "e_gain": 2734.1119535411576,
+        "h_gain": 73.82102274561124
+      },
+      "quadratic": {
+        "found": true,
+        "rho": 0.9886962890625002,
+        "rho_uncertified_below": 0.9886230468750001,
+        "verified": true,
+        "max_eigenvalue": -0.0034042686284988517,
+        "params": [
+          0.44092242782155355,
+          3527.507403167132,
+          397.5584381830142,
+          3364.6463067622253
+        ]
+      },
+      "quadratic_sector": {
+        "found": true,
+        "rho": 1.02041015625,
+        "rho_uncertified_below": 1.0203369140625,
+        "verified": true,
+        "max_eigenvalue": -0.01431168914743252,
+        "params": [
+          0.9404351139863036,
+          221.58723180599708,
+          168.3769428774101,
+          141.63812847813574,
+          601.6634444065738
+        ]
+      },
+      "quadratic_gains": {
+        "rho": 0.9943481445312501,
+        "e_gain": 1937.9319147848391,
+        "h_gain": 52.9736058326682,
+        "c": 42289.42746781418,
+        "mu_e": 0.9989937123284419,
+        "beta": 0.0007479615737749654,
+        "P": [
+          [
+            1.0,
+            -1.2879433243551375
+          ],
+          [
+            -1.2879433243551375,
+            1648.4332002026329
+          ]
+        ],
+        "lambda_q_orth": 321.23463504515644,
+        "lambda_contraction": 1697.848699804057,
+        "verification": {
+          "dissipation_max_eigenvalue": -2.0575246990843036e-10,
+          "dissipation_matrix_scale": 40640.994267611546,
+          "h_bound_max_eigenvalue": -9.959207799571914e-20,
+          "passed": true
+        }
+      }
+    }
+  ]
+}

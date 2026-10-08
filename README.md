@@ -49,7 +49,7 @@ Dense communication counts values only (`T d * 32` bits/client); Top-K additiona
 ## Repository layout
 
 - `code/`: simulators, accountant, and adversarial-search code.
-- `docs/`: research record, theorem skeleton, closure lemma, cross-objective conditions, and reproducibility review.
+- `docs/`: research record, theorem skeleton, closure lemma, cross-objective conditions, eta stability audit, and reproducibility review.
 - `repro/`: reproducibility driver and independent diagnostic audits.
 - `experiments/`: CSV/JSON ledgers, corrected headline manifests, and horizon sweeps.
 
@@ -73,6 +73,10 @@ python repro/audit_telescoping.py \
   --output experiments/softmax_simplex_telescoping_audit.json
 python repro/state_margin_probe.py \
   --output experiments/state_margin_probe_20261008.json
+python repro/quadratic_certificate_search.py \
+  --output experiments/quadratic_certificate_20261008.json
+python repro/eta_gain_probe.py \
+  --output experiments/eta_gain_scan_20261008.json
 ```
 
 The manifests record `C0`, `Cg`, `Br`, `Bh`, `Be`, `gamma`, `gamma_mode`, `reference_radius`, `noise_coefficient`, `minimum_gamma`, seeds, `epsilon`, `delta`, accountant, participation rate, sensitivity, per-round sigma, primary uniform-average metrics, explicitly labelled legacy last-iterate metrics, exact averaged iterates, iterate protocol, and bit budget. The independent checker `repro/tele_scope_softmax_simplex_audit.py` reconstructs local updates for softmax and simplex and runs a projection sign stress test.
@@ -80,9 +84,14 @@ The manifests record `C0`, `Cg`, `Br`, `Bh`, `Be`, `gamma`, `gamma_mode`, `refer
 The current implementation uses `eta=topk_frac` by default. At the headline
 compression ratio `delta=0.1`, this is not the eta recommended by Paper 3's
 EControl proof and does not satisfy the simple norm ISS condition in the
-closure note. The next theory experiment must either set Paper 3's eta
-explicitly or prove a sharper signed Lyapunov inequality for the current
-choice.
+closure note, which holds exactly when `eta < (1/sqrt(1-delta) - 1)/2`
+(0.027 at `delta=0.1`). The eta stability audit
+(`docs/p3_eta_stability_audit_zh.md`) finds that smaller eta does not help in
+practice: on box-LS it leaves utility unchanged and enlarges the e-state and
+the clipped-objective error energy, and the certified gains at Paper 3's eta
+are still far above the empirical ones. `eta=0.1` is uncertified, not shown to
+be unstable. The audit therefore keeps `eta=0.1` as the engineering default and
+treats a Top-K-specific tracking bound as the open theory step.
 
 Representative checks already run include Python compilation, finite-difference gradient checks, simplex feasibility checks, three-seed runs for softmax+ℓ1, box least squares, and simplex logistic regression, fixed-total-privacy and fixed-per-round-sigma horizon sweeps, signed projection-residual diagnostics, and matched-sensitivity baselines.
 
