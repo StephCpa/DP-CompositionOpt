@@ -162,6 +162,23 @@ def _epsilon_for_sigma(
     return float(np.min(rdp + math.log(1.0 / delta) / (orders - 1.0)))
 
 
+def _calibrated_gamma(
+    *, sigma: float, dimension: int, rounds: int, reference_radius: float,
+    minimum_gamma: float = 5.0,
+) -> float:
+    """Return the noise-scaled dual-averaging regularization parameter.
+
+    ``reference_radius`` is an explicit experiment setting.  It represents
+    the radius used to translate an iterate/noise scale into a step-size
+    scale; it is not inferred from a private release and is not a privacy
+    guarantee.  Keeping it explicit avoids silently baking a data-generator
+    constant into the calibration rule.
+    """
+    if not np.isfinite(reference_radius) or reference_radius <= 0.0:
+        raise ValueError("reference_radius must be a finite positive number")
+    return float(max(minimum_gamma, sigma * math.sqrt(dimension * rounds) / reference_radius))
+
+
 def _mean_sd(rows: Sequence[Mapping[str, Any]], key: str) -> Dict[str, float]:
     values = np.asarray([row[key] for row in rows], dtype=float)
     return {
@@ -171,7 +188,11 @@ def _mean_sd(rows: Sequence[Mapping[str, Any]], key: str) -> Dict[str, float]:
 
 
 def _summarize_softmax(runs: Mapping[str, List[Mapping[str, Any]]]) -> Dict[str, Dict[str, Any]]:
-    metrics = ("objective", "accuracy", "sigma", "sensitivity", "bits_per_client", "accounted_epsilon")
+    metrics = (
+        "objective", "accuracy", "average_objective", "average_accuracy",
+        "average_cross_entropy", "average_W_norm", "sigma", "sensitivity",
+        "bits_per_client", "accounted_epsilon",
+    )
     out: Dict[str, Dict[str, Any]] = {}
     for method, rows in runs.items():
         result: Dict[str, Any] = {"n_seeds": len(rows)}
@@ -240,6 +261,21 @@ def _corrected_box_diagnostics(result: Mapping[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def _average_iterate_manifest(result: Mapping[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
+    """Keep exact uniform-average iterates when full histories are omitted."""
+    out: Dict[str, List[Dict[str, Any]]] = {}
+    for method, rows in result.get("runs", {}).items():
+        out[method] = [
+            {
+                "seed": int(row.get("seed", -1)),
+                "average_iterate": row.get("average_iterate"),
+            }
+            for row in rows
+            if row.get("average_iterate") is not None
+        ]
+    return out
+
+
 def run_headline(modules: Mapping[str, ModuleType], *, keep_histories: bool = True) -> Dict[str, Any]:
     """Run the three objective families with the checked headline settings."""
     # The fourth baseline uses C0=1.0 so its central-DP sensitivity matches
@@ -248,8 +284,10 @@ def run_headline(modules: Mapping[str, ModuleType], *, keep_histories: bool = Tr
     box_args = _base_box_args(dense_C0=1.0)
     box_result = modules["p3_box_ls_sim"].run_suite(box_args)
     box_corrected = _corrected_box_diagnostics(box_result)
+    box_average_iterates = _average_iterate_manifest(box_result)
     simplex_args = _base_simplex_args(dense_C0=1.0)
     simplex_result = modules["p3_simplex_logistic_sim"].run_suite(simplex_args)
+    simplex_average_iterates = _average_iterate_manifest(simplex_result)
 
     soft_runs: Dict[str, List[Dict[str, Any]]] = {}
     soft_args = _base_softmax_args(dense_C0=1.0)
@@ -274,7 +312,28 @@ def run_headline(modules: Mapping[str, ModuleType], *, keep_histories: bool = Tr
             "participation_rate": 1.0,
             "release": "clean aggregate plus fresh Gaussian noise",
             "sensitivity": "2*Bh/n for Top-K; 2*C0/n for dense DA",
-            "step_size": "gamma=5.0; last iterate (matches committed headline runs)",
+            "step_size": "gamma=5.0; last and uniform-average iterates reported",
+            "iterate_reporting": {
+                "primary": "last",
+                "additional": "uniform_average",
+                "average_definition": "T^-1 * sum_{t=1}^T post-update real iterates",
+                "average_metrics_by_task": {
+                    "box_ls": [
+                        "average_objective", "average_test_mse",
+                        "average_train_mse", "average_parameter_mse",
+                        "average_x_norm",
+                    ],
+                    "softmax": [
+                        "average_objective", "average_cross_entropy",
+                        "average_accuracy", "average_W_norm",
+                    ],
+                    "simplex_logistic": [
+                        "average_objective", "average_accuracy",
+                        "average_train_objective", "average_parameter_mse",
+                        "average_w_norm",
+                    ],
+                },
+            },
             "scope_note": "Synthetic, three-seed diagnostics; no unconditional real-iterate theorem is claimed.",
             "box_settings": vars(box_args),
             "simplex_settings": vars(simplex_args),
@@ -283,9 +342,18 @@ def run_headline(modules: Mapping[str, ModuleType], *, keep_histories: bool = Tr
         "box": {
             "summary": box_result.get("summary"),
             "corrected_diagnostics": box_corrected,
+            "average_iterates": box_average_iterates,
             **({"runs": box_result.get("runs")} if keep_histories else {}),
         },
-        "simplex": simplex_result if keep_histories else {"metadata": simplex_result.get("metadata"), "summary": simplex_result.get("summary")},
+        "simplex": (
+            simplex_result
+            if keep_histories
+            else {
+                "metadata": simplex_result.get("metadata"),
+                "summary": simplex_result.get("summary"),
+                "average_iterates": simplex_average_iterates,
+            }
+        ),
         "softmax": {"summary": _summarize_softmax(soft_runs), "runs": soft_runs if keep_histories else {method: [{k: v for k, v in row.items() if k != "history"} for row in rows] for method, rows in soft_runs.items()}},
     }
 
@@ -296,13 +364,29 @@ def _run_box_case(
     *,
     corrected: bool,
     keep_histories: bool = False,
+    label: str | None = None,
+    privacy_interpretation: str | None = None,
 ) -> Dict[str, Any]:
     result = module.run_suite(args)
     payload = {
         "settings": vars(args),
         "summary": result.get("summary"),
         "corrected_diagnostics": _corrected_box_diagnostics(result) if corrected else {},
+        "average_iterates": _average_iterate_manifest(result),
+        "iterate_reporting": {
+            "primary": "last",
+            "additional": "uniform_average",
+            "average_definition": "T^-1 * sum_{t=1}^T post-update real iterates",
+            "average_metrics": [
+                "average_objective", "average_test_mse", "average_train_mse",
+                "average_parameter_mse", "average_x_norm",
+            ],
+        },
     }
+    if label is not None:
+        payload["label"] = label
+    if privacy_interpretation is not None:
+        payload["privacy_interpretation"] = privacy_interpretation
     if keep_histories:
         payload["runs"] = result.get("runs")
     return payload
@@ -314,6 +398,7 @@ def run_horizon(
     horizons: Sequence[int] = (25, 50, 100, 200),
     target_sigma: float = 0.6931788020546441,
     gamma_mode: str = "fixed",
+    reference_radius: float | None = None,
     keep_histories: bool = False,
 ) -> Dict[str, Any]:
     """Run fixed-total-budget, fixed-sigma, and signed diagnostics.
@@ -325,16 +410,27 @@ def run_horizon(
     diagnostic sweeps.
     """
     cases: Dict[str, List[Dict[str, Any]]] = {name: [] for name in (
-        "fixed_total", "fixed_sigma", "signed_clipped", "signed_noprojection"
+        "fixed_total", "fixed_sigma", "signed_unclipped", "signed_noprojection"
     )}
     rdp = modules["p3_bounded_sim"]
+    # The default is a generic box-radius scale, not the old generator-specific
+    # 1.3 constant.  Historical runs can be reproduced explicitly with
+    # ``--reference-radius 1.3``.
+    if reference_radius is None:
+        reference_radius = float(_base_box_args().Bbox)
+    reference_radius = float(reference_radius)
+    if reference_radius <= 0.0 or not np.isfinite(reference_radius):
+        raise ValueError("reference_radius must be finite and positive")
     for rounds in horizons:
         common: Dict[str, Any] = {"rounds": int(rounds)}
         # Compute the calibrated gamma after determining the relevant sigma.
         total_args = _base_box_args(rounds=rounds, epsilon=8.0)
         total_sigma = rdp.gaussian_sigma(8.0, total_args.delta_dp, 2 * total_args.Bh / total_args.n_clients, rounds, 1.0, total_args.accountant)
         if gamma_mode == "noise_calibrated":
-            total_args.gamma = max(5.0, total_sigma * math.sqrt(total_args.d * rounds) / 1.3)
+            total_args.gamma = _calibrated_gamma(
+                sigma=total_sigma, dimension=total_args.d, rounds=rounds,
+                reference_radius=reference_radius,
+            )
         cases["fixed_total"].append(_run_box_case(modules["p3_box_ls_sim"], total_args, corrected=True, keep_histories=keep_histories))
 
         fixed_eps = _epsilon_for_sigma(
@@ -343,13 +439,31 @@ def run_horizon(
         )
         fixed_args = _base_box_args(rounds=rounds, epsilon=fixed_eps)
         if gamma_mode == "noise_calibrated":
-            fixed_args.gamma = max(5.0, target_sigma * math.sqrt(fixed_args.d * rounds) / 1.3)
+            fixed_args.gamma = _calibrated_gamma(
+                sigma=target_sigma, dimension=fixed_args.d, rounds=rounds,
+                reference_radius=reference_radius,
+            )
         cases["fixed_sigma"].append(_run_box_case(modules["p3_box_ls_sim"], fixed_args, corrected=True, keep_histories=keep_histories))
 
+        # This is an intentionally unclipped-gradient signed diagnostic:
+        # C0=Cg=100 disables per-example and gradient clipping, while the
+        # h/e/r state projections remain active.
         signed_args = _base_box_args(
             rounds=rounds, epsilon=fixed_eps, C0=100.0, Cg=100.0,
         )
-        cases["signed_clipped"].append(_run_box_case(modules["p3_box_ls_signed_sim"], signed_args, corrected=True, keep_histories=keep_histories))
+        if gamma_mode == "noise_calibrated":
+            signed_args.gamma = _calibrated_gamma(
+                sigma=target_sigma, dimension=signed_args.d, rounds=rounds,
+                reference_radius=reference_radius,
+            )
+        cases["signed_unclipped"].append(_run_box_case(
+            modules["p3_box_ls_signed_sim"], signed_args, corrected=True,
+            keep_histories=keep_histories,
+            label=("unclipped-gradient signed diagnostic; h/e/r state "
+                   "projections active"),
+            privacy_interpretation=("central-DP release with per-example and "
+                                    "gradient clipping disabled; diagnostic only"),
+        ))
 
         no_projection_args = _base_box_args(
             rounds=rounds, epsilon=_epsilon_for_sigma(
@@ -357,7 +471,19 @@ def run_horizon(
                 rounds=rounds, delta=total_args.delta_dp, accountant=total_args.accountant,
             ), C0=100.0, Cg=100.0, Br=100.0, Bh=10.0, Be=100.0,
         )
-        cases["signed_noprojection"].append(_run_box_case(modules["p3_box_ls_signed_sim"], no_projection_args, corrected=True, keep_histories=keep_histories))
+        if gamma_mode == "noise_calibrated":
+            no_projection_args.gamma = _calibrated_gamma(
+                sigma=target_sigma, dimension=no_projection_args.d, rounds=rounds,
+                reference_radius=reference_radius,
+            )
+        cases["signed_noprojection"].append(_run_box_case(
+            modules["p3_box_ls_signed_sim"], no_projection_args, corrected=True,
+            keep_histories=keep_histories,
+            label=("unclipped, no-state-projection signed diagnostic"),
+            privacy_interpretation=("high-epsilon diagnostic; not a meaningful "
+                                    "DP utility baseline (effectively non-private "
+                                    "at the reported epsilon values)"),
+        ))
 
     manifest = {
         "driver": "repro/run_reproducibility.py",
@@ -365,7 +491,35 @@ def run_horizon(
         "horizons": [int(t) for t in horizons],
         "target_sigma": float(target_sigma),
         "gamma_mode": gamma_mode,
-        "gamma_calibration": "max(5, sigma*sqrt(d*T)/1.3)" if gamma_mode == "noise_calibrated" else "gamma=5.0",
+        "reference_radius": float(reference_radius),
+        "gamma_calibration": (
+            "max(5, sigma*sqrt(d*T)/reference_radius)"
+            if gamma_mode == "noise_calibrated" else "gamma=5.0"
+        ),
+        "gamma_calibration_note": (
+            "reference_radius is an explicit experiment parameter; the default "
+            "is Bbox=2.0. Pass --reference-radius 1.3 only to reproduce the "
+            "historical generator-informed calibration."
+        ),
+        "iterate_reporting": {
+            "primary": "last",
+            "additional": "uniform_average",
+            "average_definition": "T^-1 * sum_{t=1}^T post-update real iterates",
+            "average_metrics": [
+                "average_objective", "average_test_mse", "average_train_mse",
+                "average_parameter_mse", "average_x_norm",
+            ],
+        },
+        "case_labels": {
+            "signed_unclipped": (
+                "C0=Cg=100: gradient and per-example clipping disabled; "
+                "h/e/r state projections active"
+            ),
+            "signed_noprojection": (
+                "C0=Cg=Br=Bh=Be=100: all clipping/state projections disabled; "
+                "high-epsilon, effectively non-private diagnostic"
+            ),
+        },
         "seeds": [0, 1, 2],
         "accountant": "without_replacement_bound",
         "participation_rate": 1.0,
@@ -395,6 +549,12 @@ def main() -> None:
     parser.add_argument("--horizons", default="25,50,100,200")
     parser.add_argument("--target-sigma", type=float, default=0.6931788020546441)
     parser.add_argument("--gamma-mode", choices=("fixed", "noise_calibrated"), default="fixed")
+    parser.add_argument(
+        "--reference-radius", type=float, default=None,
+        help=("positive radius used by noise_calibrated gamma; default is the "
+              "generic Bbox=2.0 scale. Use 1.3 only to reproduce historical "
+              "generator-informed runs."),
+    )
     parser.add_argument("--keep-histories", action="store_true")
     args = parser.parse_args()
     modules = _load_modules(_find_code_dir(args.code_dir))
@@ -408,6 +568,7 @@ def main() -> None:
             horizons=horizons,
             target_sigma=args.target_sigma,
             gamma_mode=args.gamma_mode,
+            reference_radius=args.reference_radius,
             keep_histories=args.keep_histories,
         )
     output = Path(args.output)

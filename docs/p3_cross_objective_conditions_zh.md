@@ -4,7 +4,7 @@
 
 本文档把四个模拟器使用的同一主机制写成可以逐目标核查的条件表：客户端级中心 DP、全参与 `q=1`、每轮 fresh Gaussian noise 加在当前 clean aggregate release 上、bounded EControl、真实迭代，Composite Dual Averaging 的 prox 处理约束或正则项。服务器状态不整合带噪差分，最终报告真实迭代。每轮发布对象若是每客户端有界状态的平均值，替换邻接下的 L2 敏感度取 `2 B_h / n`；无压缩 dense DA 的对应半径是 `C0`。
 
-这份表只建立候选定理所需的目标函数常数和 prox 几何，不能替代对 Paper 3 真实迭代误差项的闭合证明。关键未解决条件仍是 movement-coupled 累计误差 `E_t` 的二阶和。
+这份表只建立候选定理所需的目标函数常数和 prox 几何，不能替代对 Paper 3 真实迭代误差项的闭合证明。主线的 `2 B_h / n` 单轮敏感度已经由显式有界状态闭合；关键未解决条件是 movement-coupled 累计误差 `E_t` 的二阶和，尤其是 e/r 投影残差累计量 `P_T`。
 
 ## 逐目标条件
 
@@ -44,7 +44,7 @@
 每个实验点必须保存：
 
 - `q`、参与模型和 accountant 类型；
-- `sensitivity`、每轮 `sigma_t` 或其调度；
+- `sensitivity`（主线为 `2 B_h / n`）、每轮 `sigma_t` 或其调度；
 - `B_h, B_e, B_r, C0, Cg` 与约束半径；
 - state age 的均值、P90、最大值；
 - prefix/tail clipping residual；
@@ -68,6 +68,6 @@
 
 投影残差应以 signed vector 进入主诊断：
 
-`rho_t = average_i (p^h_{i,t} + p^e_{i,t} + p^r_{i,t})`。
+`rho_t = average_i (u_{i,t} - v_{i,t})`，即 simulator 与审计中实际记录的 signed projection/cache residual。若把各次 `raw-new` 投影残差单独展开，`rho_t` 可进一步写成这些残差与缓存差分的 telescoping 组合；不能把 `p^h+p^e+p^r` 的范数或坐标同向和直接当作 `rho_t`。历史 norm proxy 只作压力测试，已标记为 legacy。
 
 把残差范数同向放入一个坐标只能作为保守压力测试，不应作为最终理论对象。

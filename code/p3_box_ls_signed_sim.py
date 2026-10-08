@@ -129,6 +129,10 @@ class BoxLSEControlDA:
         self.r = np.zeros((self.n, self.d))
         self.last_update = np.zeros(self.n, dtype=int)
         self.x = np.zeros(self.d)
+        # Sum of real iterates for theorem-facing averaged-iterate metrics.
+        # ``x`` continues to denote the last iterate for compatibility with
+        # the historical signed diagnostic outputs.
+        self.x_sum = np.zeros(self.d)
         self.G = np.zeros(self.d)
         self.A = 0.0
         self.t = 0
@@ -263,6 +267,7 @@ class BoxLSEControlDA:
         self.G += released
         self.A += 1.0
         self.x = self._prox_da()
+        self.x_sum += self.x
 
         # Theorem-aligned decomposition:
         # c_t   = H_t - mean_i u_{i,t}
@@ -323,6 +328,9 @@ class BoxLSEControlDA:
         train_X = np.concatenate([xy[0] for xy in self.clients], axis=0)
         train_y = np.concatenate([xy[1] for xy in self.clients], axis=0)
         train_loss, _ = ls_loss_and_grad(train_X, train_y, self.x)
+        x_average = self.x_sum / max(self.cfg.rounds, 1)
+        average_test_loss, _ = ls_loss_and_grad(Xtest, ytest, x_average)
+        average_train_loss, _ = ls_loss_and_grad(train_X, train_y, x_average)
         last = self.history[-1]
         bits_per_value = 32
         index_bits = int(np.ceil(np.log2(max(self.d, 2))))
@@ -337,6 +345,13 @@ class BoxLSEControlDA:
             "test_mse": float(2.0 * test_loss),
             "train_mse": float(2.0 * train_loss),
             "parameter_mse": float(np.mean((self.x - w_true) ** 2)),
+            "average_objective": float(average_test_loss),
+            "average_test_mse": float(2.0 * average_test_loss),
+            "average_train_mse": float(2.0 * average_train_loss),
+            "average_parameter_mse": float(np.mean((x_average - w_true) ** 2)),
+            "average_x_norm": float(np.linalg.norm(x_average)),
+            "average_iterate": x_average.tolist(),
+            "iterate_reporting": "last_and_uniform_average",
             "x_norm": float(np.linalg.norm(self.x)),
             "sigma": float(self.sigma),
             "sensitivity": float(self.sensitivity),
@@ -407,7 +422,9 @@ def run_one(seed: int, args: argparse.Namespace) -> Dict[str, Dict]:
 def summarize(all_results: Dict[str, List[Dict]]) -> Dict[str, Dict]:
     summary: Dict[str, Dict] = {}
     metrics = [
-        "objective", "test_mse", "train_mse", "parameter_mse", "sigma",
+        "objective", "test_mse", "train_mse", "parameter_mse",
+        "average_objective", "average_test_mse", "average_train_mse",
+        "average_parameter_mse", "average_x_norm", "sigma",
         "sensitivity", "bits_per_client", "state_age_mean", "state_age_p90",
         "state_age_max", "prefix_clip_residual", "tail_prefix_clip_residual",
         "mean_movement", "sum_movement", "mean_E_t_norm", "max_E_t_norm",
@@ -451,6 +468,7 @@ def run_suite(args: argparse.Namespace) -> Dict:
         "metadata": {
             "task": "Paper3 DP box-constrained least squares",
             "mechanism": "fresh Gaussian aggregate release; real iterates; full participation q=1",
+            "iterate_reporting": "last and uniform-average real iterates",
             "n_seeds": int(args.n_seeds),
             "seed_start": int(args.seed),
             "gradient_finite_difference_max_error": float(grad_err),

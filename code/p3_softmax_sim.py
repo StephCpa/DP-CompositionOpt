@@ -139,6 +139,9 @@ class SoftmaxEControlDA:
         self.e = np.zeros((self.n, self.D))
         self.r = np.zeros((self.n, self.D))
         self.W = np.zeros((self.d, self.n_classes))
+        # Uniform average of real iterates.  ``W`` remains the last iterate
+        # used by the historical headline metrics.
+        self.W_sum = np.zeros_like(self.W)
         self.G = np.zeros(self.D)
         self.A = 0.0
         self.t = 0
@@ -281,6 +284,7 @@ class SoftmaxEControlDA:
         self.G += released
         self.A += 1.0
         self.W = self._prox_da().reshape(self.d, self.n_classes)
+        self.W_sum += self.W
 
         self.history.append(
             {
@@ -315,6 +319,11 @@ class SoftmaxEControlDA:
         pred = np.argmax(Xtest @ self.W, axis=1)
         acc = float(np.mean(pred == ytest))
         objective = float(loss + self.cfg.l1 * np.abs(self.W).sum())
+        W_average = self.W_sum / max(self.cfg.rounds, 1)
+        average_loss, _ = softmax_loss_and_grad(Xtest, ytest, W_average, self.n_classes)
+        average_pred = np.argmax(Xtest @ W_average, axis=1)
+        average_accuracy = float(np.mean(average_pred == ytest))
+        average_objective = float(average_loss + self.cfg.l1 * np.abs(W_average).sum())
         last = self.history[-1]
         bits_per_value = 32
         index_bits = int(np.ceil(np.log2(max(self.D, 2))))
@@ -329,6 +338,12 @@ class SoftmaxEControlDA:
             "cross_entropy": float(loss),
             "accuracy": acc,
             "W_norm": float(np.linalg.norm(self.W)),
+            "average_objective": average_objective,
+            "average_cross_entropy": float(average_loss),
+            "average_accuracy": average_accuracy,
+            "average_W_norm": float(np.linalg.norm(W_average)),
+            "average_iterate": W_average.tolist(),
+            "iterate_reporting": "last_and_uniform_average",
             "sigma": float(self.sigma),
             "sensitivity": float(self.sensitivity),
             "epsilon": float(self.cfg.epsilon if self.cfg.private else 0.0),

@@ -18,9 +18,41 @@ also reconstructed only to quantify how far the old diagnostic would differ.
 """
 from __future__ import annotations
 
+import argparse
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
+
+# Resolve the simulator directory before importing the modules.  The
+# repository keeps simulators under ``code/`` while the historical flat
+# checkout keeps them beside this file.  This makes the audit runnable as
+# ``python repro/tele_scope_softmax_simplex_audit.py`` from the repository
+# root without relying on PYTHONPATH.
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent if SCRIPT_DIR.name == "repro" else SCRIPT_DIR
+_candidates = []
+for _arg_idx, _arg in enumerate(sys.argv[1:]):
+    if _arg == "--code-dir" and _arg_idx + 1 < len(sys.argv[1:]):
+        _candidates.append(Path(sys.argv[1:][_arg_idx + 1]))
+    elif _arg.startswith("--code-dir="):
+        _candidates.append(Path(_arg.split("=", 1)[1]))
+if os.environ.get("P3_CODE_DIR"):
+    _candidates.append(Path(os.environ["P3_CODE_DIR"]))
+if (REPO_ROOT / "code").is_dir():
+    _candidates.append(REPO_ROOT / "code")
+_candidates.extend([SCRIPT_DIR, REPO_ROOT])
+CODE_DIR = next(
+    (p.resolve() for p in _candidates if (p / "p3_bounded_sim.py").is_file()),
+    None,
+)
+if CODE_DIR is None:
+    raise RuntimeError(
+        "Could not locate p3_bounded_sim.py. Use P3_CODE_DIR or --code-dir."
+    )
+if str(CODE_DIR) not in sys.path:
+    sys.path.insert(0, str(CODE_DIR))
 
 import numpy as np
 
@@ -36,7 +68,7 @@ from p3_simplex_logistic_sim import (
     make_simplex_data,
 )
 
-ROOT = Path(__file__).resolve().parent
+DEFAULT_OUTPUT = REPO_ROOT / "experiments" / "tele_scope_softmax_simplex_audit.json"
 
 
 def _finite_max(vals: List[float]) -> float:
@@ -414,7 +446,7 @@ def make_simplex(seed: int, private: bool = True):
     return SimplexLogisticEControlDA(clients, cfg)
 
 
-def main():
+def main(output: Path = DEFAULT_OUTPUT):
     all_results: Dict[str, List[Dict[str, Any]]] = {}
     for kind, maker in [("softmax", make_softmax), ("simplex", make_simplex)]:
         for private in (False, True):
@@ -443,10 +475,38 @@ def main():
         },
         "results": all_results,
     }
-    out_path = ROOT / "tele_scope_softmax_simplex_audit.json"
+    out_path = output
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(out, indent=2), encoding="utf-8")
     print(f"wrote {out_path}")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(
+        description="Audit theorem-aligned signed diagnostics for softmax and simplex."
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=DEFAULT_OUTPUT,
+        help="Output JSON path (default: experiments/tele_scope_softmax_simplex_audit.json).",
+    )
+    parser.add_argument(
+        "--code-dir",
+        type=Path,
+        default=None,
+        help="Optional simulator directory; equivalent to P3_CODE_DIR.",
+    )
+    args = parser.parse_args()
+    if args.code_dir is not None:
+        code_dir = args.code_dir.resolve()
+        if not (code_dir / "p3_bounded_sim.py").is_file():
+            parser.error(f"--code-dir does not contain p3_bounded_sim.py: {code_dir}")
+        # The imports above happen before argument parsing, so a custom path
+        # is intended for unusual layouts and must be supplied through the
+        # environment in those cases.
+        if code_dir != CODE_DIR:
+            parser.error(
+                "For a custom code directory set P3_CODE_DIR before invoking the script."
+            )
+    main(args.output)

@@ -136,6 +136,9 @@ class SimplexLogisticEControlDA:
         self.r = np.zeros((self.n, self.d))
         self.last_update = np.zeros(self.n, dtype=int)
         self.w = np.full(self.d, 1.0 / self.d)
+        # Uniform average of real simplex iterates.  ``w`` remains the last
+        # iterate used by the historical headline metrics.
+        self.w_sum = np.zeros(self.d)
         self.G = np.zeros(self.d)
         self.t = 0
         self.prefix_h_clip = np.zeros(self.n)
@@ -241,6 +244,7 @@ class SimplexLogisticEControlDA:
         released = h_clean + z
         self.G += released
         self.w = self._prox_da()
+        self.w_sum += self.w
 
         u_bar = np.mean([s["u_vec"] for s in stats], axis=0)
         v_bar = np.mean([s["v_vec"] for s in stats], axis=0)
@@ -296,6 +300,11 @@ class SimplexLogisticEControlDA:
         train_loss, _ = logistic_loss_and_grad(Xtrain, ytrain, self.w)
         pred = (sigmoid(Xtest @ self.w) >= 0.5).astype(float)
         acc = float(np.mean(pred == ytest))
+        w_average = self.w_sum / max(self.cfg.rounds, 1)
+        average_test_loss, _ = logistic_loss_and_grad(Xtest, ytest, w_average)
+        average_train_loss, _ = logistic_loss_and_grad(Xtrain, ytrain, w_average)
+        average_pred = (sigmoid(Xtest @ w_average) >= 0.5).astype(float)
+        average_accuracy = float(np.mean(average_pred == ytest))
         last = self.history[-1]
         bits_value = 32
         index_bits = int(np.ceil(np.log2(max(self.d, 2))))
@@ -308,6 +317,13 @@ class SimplexLogisticEControlDA:
             "objective": float(test_loss), "accuracy": acc,
             "train_objective": float(train_loss),
             "parameter_mse": float(np.mean((self.w - w_true) ** 2)),
+            "average_objective": float(average_test_loss),
+            "average_accuracy": average_accuracy,
+            "average_train_objective": float(average_train_loss),
+            "average_parameter_mse": float(np.mean((w_average - w_true) ** 2)),
+            "average_w_norm": float(np.linalg.norm(w_average)),
+            "average_iterate": w_average.tolist(),
+            "iterate_reporting": "last_and_uniform_average",
             "simplex_sum_error": float(abs(self.w.sum() - 1.0)),
             "simplex_min": float(self.w.min()),
             "sigma": float(self.sigma), "sensitivity": float(self.sensitivity),
@@ -362,6 +378,8 @@ def run_one(seed: int, args: argparse.Namespace):
 
 def summarize(all_results):
     metrics = ["objective", "accuracy", "train_objective", "parameter_mse",
+               "average_objective", "average_accuracy", "average_train_objective",
+               "average_parameter_mse", "average_w_norm",
                "sigma", "sensitivity", "bits_per_client", "state_age_mean",
                "state_age_p90", "state_age_max", "prefix_clip_residual",
                "tail_prefix_clip_residual", "mean_movement", "max_movement",
@@ -399,6 +417,7 @@ def run_suite(args):
     return {"metadata": {
         "task": "Paper3 DP simplex-constrained logistic regression",
         "mechanism": "fresh Gaussian aggregate release; real iterates; full participation q=1",
+        "iterate_reporting": "last and uniform-average real iterates",
         "n_seeds": int(args.n_seeds), "seed_start": int(args.seed),
         "simplex_projection_max_feasibility_error": float(proj_err),
         "gradient_finite_difference_max_error": float(grad_err),

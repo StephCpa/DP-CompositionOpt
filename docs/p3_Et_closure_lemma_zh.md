@@ -6,6 +6,8 @@
 >
 > 当前明确排除：带噪差分的服务器端二次积分、最终未压缩上传、虚拟迭代作为最终理论对象、固定大小客户端抽样的主定理、原始无界 EControl 状态的时间无关敏感度。
 
+当前主线的单轮敏感度已经闭合：固定发布历史后，显式投影给出 `S_h=2B_h/n`；剩余未闭合项是效用证明中的 `E_t`，尤其是 e/r 投影残差累计量 `P_T`，而不是隐私敏感度。
+
 ---
 
 ## 1. 目的与核心结论
@@ -646,7 +648,7 @@ T(\bar\sigma_0^2+d\bar\sigma_{\mathrm{DP}}^2)=O(T).
 
 ### 8.2 对 movement 和 `E_t` 的影响
 
-将上式代入 `MC-4`，即使投影残差和局部随机变化仍为 `O(T)`，右侧也包含 `O(T^2)` 的 DP 方差项。因此安全的条件式界只能写成
+将上式代入 `MC-4`，即使投影残差和局部随机变化仍为 `O(T)`，右侧也包含 `O(T^2)` 的 DP 方差项。因此在固定总隐私预算的长 horizon 情形，安全的条件式界只能写成
 
 \[
 \mathcal M_T=O(T^2),
@@ -668,14 +670,14 @@ K_E(T)=O(T)
 
 ### 8.3 为什么模拟中会比线性更差
 
-当前盒约束实验的固定总隐私预算扫描中，`T=25,50,100,200` 时 DP-TopK 的平均 movement 和 `Q_T/T` 都快速增加。这与以下机制一致：
+旧版盒约束 horizon 扫描把 norm proxy 当成理论 `Q_T/T`，因此曾给出“DP-TopK 的 `Q_T/T` 快速增加”的结论。该结论已撤回。固定总隐私预算下，逐轮 `sigma` 和 movement 确实会随 T 改变：
 
 1. 总隐私预算固定，逐轮 `sigma` 增大；
-2. movement 增大，局部输入变化 `D_t` 增大；
-3. EControl 误差能量增大；
+2. movement 可能增大，局部输入变化 `D_t` 受到影响；
+3. EControl 跟踪能量和原始目标的 clipping bias 可能增大；
 4. 真实 DA 迭代又受到更大的 DP oracle 方差影响。
 
-补充的固定噪声扫描显示，即使把 `sigma` 固定在约 `0.6932`，`T=25,50,100,200` 时 `Q_T/T` 仍约为 `158.7,428.9,1212.3,2568.7`。这说明固定逐轮 DP 噪声并不足以保证 `Q_T=O(T)`；持续的 clipping bias 也可能被累积进 `E_t`，并通过 movement 反馈放大。
+这些机制支持报告 privacy-limited utility knee，但不能用旧 proxy 证明 clipped-objective 的理论误差超线性。按 signed decomposition 重算后，no-projection 高 epsilon/non-private 诊断的 clipped-objective `Q_T/T` 为 `3.06,2.49,2.37,2.18`，呈平坦或下降趋势；原始目标的偏差仍须通过 `beta_t` 单独报告。固定总预算的主线结论应同时给出 `gamma_protocol`、last/averaged iterate、每轮 `sigma_t` 和 signed `P_T`，而不是只报告旧表中的 `Q_T/T`。
 
 这些数值结果是对闭合引理的压力测试，不是 `EF-1` 的证明。论文中应报告 `sigma_t`、`D_t`、`P_t`、`M_t`、`mathfrak C_t`、`mathfrak R_t`、`mathfrak B_t` 和 `Q_T/T`，而不是只报告最终目标函数。
 
@@ -808,8 +810,8 @@ Q_T\le K_E T.
 2. **单客户端确定性轨迹**：用固定输入序列比较 `C_t`、局部状态 Lyapunov 和 `D_t`；
 3. **movement 扫描**：人工注入不同大小的 `x_{t+1}-x_t`，估计 `K_x`；
 4. **投影残差扫描**：逐渐缩小 `B_h,B_e,B_r`，检查 `P_t` 是否按 `MC-1` 进入；
-5. **固定 `sigma` horizon 扫描**：检验 `Q_T/T` 是否稳定；
-6. **固定总 epsilon horizon 扫描**：报告 `K_E(T)=Q_T/T` 的增长，而不是把增长误判成优化不稳定；
+5. **固定 `sigma` horizon 扫描**：使用 signed decomposition 检验 clipped-objective `Q_T/T`，并把旧 norm proxy 标为 legacy；
+6. **固定总 epsilon horizon 扫描**：报告基于 signed decomposition 的 `K_E(T)=Q_T/T`，并把旧 norm proxy 标为 legacy；不能把 proxy 增长误判成优化不稳定；
 7. **clipping bias ablation**：无 clipping、仅输入 clipping、加 residual feedback 三组对照；
 8. **DA 常数检查**：对 box、simplex、softmax+`l1` 分别核查 `L`、prox 非扩张性和 movement 系数。
 

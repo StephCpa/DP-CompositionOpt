@@ -179,30 +179,31 @@ x_{t+1}=\arg\min_x\left\{
 
 ## 4. 隐私证明目标和候选引理
 
-### 4.1 可以立即得到的状态截断敏感度界
+### 4.1 主线已证的状态截断敏感度界
 
-**候选引理 1（有界活跃状态聚合敏感度）**。若每个客户端状态在发布前满足
+**引理 1（有界活跃状态聚合敏感度）**。在主线机制中，每个客户端状态在发布前满足
 
 \[
-\|h_{i,t}\|_2\le B_h,
+\|h_{i,t}\|_2\le B_h.
 \]
 
-则在客户端级替换邻接下，条件于同一个活跃集合 \(S_t\) 且改变的客户端属于 \(S_t\)，有
+固定已经发布的历史 \(y_{<t}\) 后，邻接运行的真实迭代 \(x_s\)（以及未被替换客户端的状态轨迹）相同；被替换客户端的两个 \(h\) 状态分别落在同一个半径 \(B_h\) 的球内。因此，在客户端级替换邻接下，条件于同一个活跃集合 \(S_t\) 且改变的客户端属于 \(S_t\)，有确定性界
 
 \[
 \left\|h_t^{\mathrm{act}}-(h_t^{\mathrm{act}})'\right\|_2
 \le \frac{2B_h}{m}.
 \]
 
-若改变的客户端不在 \(S_t\)，本轮直接敏感度为 0，但其数据可能通过未来参与轮次影响后续状态。若选择集合与数据独立，整个轨迹可按逐轮自适应组合处理；需要明确状态的持久化和客户端再次参与时的条件敏感度。
+全参与主线取 \(m=n\)，得到每轮发布的敏感度
+\(S_h=2B_h/n\)。这个界不需要 Top-K 的连续性，也不需要证明原始无界 EControl 的状态差异；它直接由显式状态投影和固定发布历史下的自适应后处理得到。对每轮 fresh Gaussian release 进行自适应 RDP 组合，即可得到完整发布轨迹的中心 DP 保证。
 
-全参与时取 \(m=n\)，得到 \(2B_h/n\)。这条界与 Top-K 的连续性无关，是当前机制采用状态截断的主要原因。
+若改变的客户端不在 \(S_t\)，本轮直接敏感度为 0；其数据仍可能在未来重新参与时影响状态。若抽样集合与数据独立，逐轮组合仍可使用上述条件敏感度，但需要同时记录参与模式和状态持久化规则。
 
 前缀 FTRL 参考的敏感度不同：代码中的 `prefix` 是 curator 侧的单个持久状态，而不是客户端局部状态的逐轮平均。即使每轮输入增量来自活跃平均值，把累计 `prefix` 直接截断到半径 \(B_s\) 只能得到发布球的直径界 \(2B_s\)，不能额外乘上 \(1/m\)。因此不能用 EControl active-average 的 \(2B_h/m\) 公式给前缀参考记账。
 
-由于 prefix 的差异会在客户端下一次参与后持续存在，即使该客户端在后续轮次不活跃，前缀轨迹仍可能不同；因此前缀参考还不能逐轮套用客户端抽样放大。代码对 prefix 使用 accountant_q=1，即无放大的保守账本。对应的修正扫描保存在 prefix_corrected_sensitivity_scan.json，旧的带 q 放大数值不再用于比较结论。
+由于 prefix 的差异会在客户端下一次参与后持续存在，即使该客户端在后续轮次不活跃，前缀轨迹仍可能不同；因此前缀参考还不能逐轮套用客户端抽样放大。代码对 prefix 使用 accountant_q=1，即无放大的保守账本。对应的修正扫描保存在 `prefix_corrected_sensitivity_scan.json`，旧的带 q 放大数值不再用于比较结论。
 
-**候选引理 1 的限制**：它只控制每轮的发布均值。若希望给出比逐轮高斯机制更紧的矩阵机制/相关噪声界，还需分析累计工作负载和参与模式；不能从该引理自动推出相关噪声优于独立噪声。
+**引理 1 的范围**：它闭合的是当前显式有界状态机制的单轮发布敏感度，不是原始无界 EControl 的敏感度界，也不自动给出矩阵机制/相关噪声优于独立 fresh release 的结论。后者还需要分析累计工作负载和参与模式。
 
 ### 4.2 固定大小抽样的 RDP 账本
 
@@ -224,7 +225,7 @@ x_{t+1}=\arg\min_x\left\{
 | \(d=16,T=150\) | 1 | \(1/16\) | 6.06 | 5.41 |
 | \(d=16,T=150\) | 1 | \(1/(16\cdot400)\) | 4.48 | 4.00 |
 
-这些结果是有限维度、有限轮数和启发式坐标/状态搜索，不能作为反例定理；但它们足以否定“可以直接假定消息敏感度约为 2”的研究路线。若对抗性搜索在更大范围继续显著增长，应优先使用发布裁剪或状态截断，而不是继续寻找无界 Top-K 的统一常数。
+这些结果针对的是**未截断的原始 EControl 变体**，不是当前主线的有界状态机制。它们是有限维度、有限轮数和启发式坐标/状态搜索，不能作为反例定理；但足以说明不能把无界 Top-K 的消息敏感度直接假定为约 2。主线不再寻找这个无界常数；后续只把该变体作为风险诊断，并继续使用显式状态截断的敏感度界。
 
 ### 4.4 关于误差缓存的候选结论
 
@@ -498,9 +499,9 @@ softmax 梯度有限差分检查的最大绝对误差约为 \(10^{-7}\)。
 
 ## 9. 停止条件和决策规则
 
-### 停止条件 1：敏感度可证明或切换发布裁剪
+### 停止条件 1：敏感度可证明或切换发布裁剪（主线已通过）
 
-在有限维、有限轮数的对抗性搜索中，若未截断的 \(h\) 或 \(\Delta\) 继续显著超过预设目标（例如约 2–3），则停止寻找原始 EControl 的时间无关敏感度常数，采用有界状态或直接发布裁剪。只有找到对任意自适应有界输入流成立的统一界，才把未截断机制升级为理论主线。
+当前主线已经通过这一门槛：显式投影保证 \(\|h_{i,t}\|\le B_h\)，固定发布历史后每轮客户端替换敏感度确定为 \(2B_h/n\)，并可进入自适应 Gaussian/RDP 组合。原始无界 EControl 的对抗性搜索仍保留为风险诊断，但不再作为主线敏感度证明对象；无需继续寻找无界机制的时间无关常数。
 
 ### 停止条件 2：固定比特曲线必须存在非平凡优势
 
@@ -560,18 +561,18 @@ softmax 梯度有限差分检查的最大绝对误差约为 \(10^{-7}\)。
 - [p3_box_ls_sim.py](../code/p3_box_ls_sim.py)
 - [box_ls_results.json](../experiments/box_ls_results.json)
 
-### 8.8 固定总隐私预算下的 T 扫描：不能把 O(T) 条件直接外推
+### 8.8 固定总隐私预算下的 T 扫描：历史 proxy 已废弃，utility 需重新解读
 
 在盒约束最小二乘上进一步固定总预算 \((\varepsilon,\delta)=(8,10^{-5})\)，分别取 \(T\in\{25,50,100,200\}\)，每个点使用三个随机种子。这里的逐轮 Gaussian 标准差由同一个总预算账本重新计算，因此 \(\sigma\) 随轮数上升。DP-TopK 的关键诊断如下：
 
-| T | \(\sigma\) | 测试 MSE | 平均 movement | \(\sum_t\|E_t\|^2/T\) |
+| T | \(\sigma\) | 测试 MSE | 平均 movement | 历史 norm-proxy \(\sum_t\|E_t^{\mathrm{proxy}}\|^2/T\)（已废弃） |
 |---:|---:|---:|---:|---:|
 | 25 | 0.3466 | 0.1530 ± 0.0317 | 0.2244 | 74.1 |
 | 50 | 0.4902 | 0.5538 ± 0.3065 | 0.3156 | 182.7 |
 | 100 | 0.6932 | 1.4998 ± 0.8872 | 0.4385 | 1,212.3 |
 | 200 | 0.9803 | 7.1515 ± 5.0996 | 0.6085 | 13,715.9 |
 
-完整逐 seed 数值和全部统计量在 `box_T_sweep_summary.json` 和 `box_T_sweep/` 中。可靠结论是：在固定总预算下，\(\sigma\) 增长、DP movement 增长，且 \(\sum_t\|E_t\|^2/T\) 严重上升。因而 Candidate Theorem A 中的 \(\sum_t\mathbb E\|E_t\|^2=O(T)\) 只能作为固定或受控的逐轮噪声日程下的条件；它不能在固定总 \(\varepsilon\) 且任意延长 T 时被当作无条件经验规律。
+完整逐 seed 数值和全部统计量在历史文件 `box_T_sweep_summary.json` 和 `box_T_sweep/` 中；这些文件使用旧 norm proxy，现标记为 `legacy/superseded`。固定总预算下 \(\sigma\) 和 movement 随 T 改变仍是可靠观察，但表中的 proxy 增长不再代表理论 \(E_t\) 或 clipped-objective 的 \(Q_T\)。Candidate Theorem A 不能在固定总 \(\varepsilon\) 且任意延长 T 时假定 horizon 无关的 \(K_E\)；新版实验必须同时报告 signed decomposition、`gamma_protocol`、iterate protocol 和每轮噪声。
 
 这也改变实验报告方式：任何收敛曲线必须同时报告总预算、逐轮 \(\sigma_t\)、T 和 accountant。增加轮数并不等价于免费增加优化步数；当总隐私预算固定时，后续步的噪声会反过来放大 movement、clipping bias 与累计误差。下一阶段应分别做两条曲线：(i) 固定逐轮噪声，观察条件项是否近似线性；(ii) 固定总隐私预算，报告 privacy-limited utility knee，而不拟合一个独立于预算的 O(T) 定律。
 
@@ -598,29 +599,25 @@ softmax 梯度有限差分检查的最大绝对误差约为 \(10^{-7}\)。
 
 已将 softmax+\(\ell_1\)、box least squares 与 simplex logistic 的 \(L\)、梯度半径、prox/投影非扩张性、movement-coupled \(E_t\) 和最低账本字段整理成单独核查表：[p3_cross_objective_conditions_zh.md](p3_cross_objective_conditions_zh.md)。该表是进入 FashionMNIST 前的理论审计入口。
 
-### 8.10 固定逐轮 \(\sigma\) 对照：持续 clipping bias 是第二个闭合障碍
+### 8.10 固定逐轮 \(\sigma\) 对照：历史 proxy 已废弃，clipping bias 仍是第二个闭合障碍
 
-为区分总隐私预算账本和 EControl 本身的累计误差，固定每轮 \(\sigma=0.6931788\)，只改变轮数 T；对应的总 \(\varepsilon\) 随 T 增大，而逐轮噪声保持不变。盒约束最小二乘、三个随机种子、DP-TopK 的结果为：
+旧版实验固定每轮 \(\sigma=0.6931788\)，只改变轮数 \(T\)，并把 norm proxy 误记成理论 \(E_t\)。该表仍可用于说明固定逐轮噪声时总隐私损失随轮数增加，但最后一列不再支持关于 \(Q_T\) 的理论结论：
 
-| T | 对应总 \(\varepsilon\) | 测试 MSE | 平均 movement | \(\sum_t\|E_t\|^2/T\) |
+| T | 对应总 \(\varepsilon\) | 测试 MSE | 平均 movement | 历史 norm-proxy \(\sum_t\|E_t^{\mathrm{proxy}}\|^2/T\)（已废弃） |
 |---:|---:|---:|---:|---:|
 | 25 | 3.726 | 1.0274 ± 0.1532 | 0.4331 | 158.7 |
 | 50 | 5.424 | 1.5125 ± 0.9684 | 0.4412 | 428.9 |
 | 100 | 8.000 | 1.4998 ± 0.8872 | 0.4385 | 1,212.3 |
 | 200 | 12.000 | 2.1430 ± 1.2143 | 0.4381 | 2,568.7 |
 
-即使逐轮 \(\sigma\) 不变，\(\sum_t\|E_t\|^2/T\) 仍显著上升。当前模拟器把
-
-\(\beta_t=\nabla F_t-\nabla F_{t,\mathrm{clipped}}\)
-
-作为累计误差的一部分，因此只要梯度 clipping bias 长期非零，\(E_t\) 就可能呈线性增长，进而使二阶和呈超线性增长。这个结果排除了“只要控制 DP 噪声日程就自动得到 \(O(T)\)”的表述。
+这些数值来自旧的“把残差范数同向累加”的诊断量，文件 `box_fixed_sigma_sweep_summary.json` 已标记为 `legacy/superseded`。按理论 signed decomposition 重新计算时，应分别报告 clipped-objective 的 \(Q_T^{\mathrm{clip}}\) 与原始目标的 \(\beta_t\) 偏差。固定逐轮 \(\sigma\) 仍不能消除 clipping bias 条件，但不能再用上述 proxy 数值证明 clipped-objective 的 \(Q_T/T\) 发散。
 
 正式理论应拆成两个版本：
 
 1. **Clipped-objective 版本**：把被 clipping 后的梯度定义为目标函数的随机 oracle，令 \(\beta_t=0\)，先证明 bounded EControl + DP fresh release 对 clipped objective 的条件式真实迭代界；
-2. **原始-objective 版本**：额外假设 clipping bias 可加和、零均值，或加入单独的 clipping-residual feedback，使 \(\sum_t\mathbb E\|\sum_{s<t}\beta_s\|^2\)=O(T)\)。否则只能给出“优化 clipped objective 加一个可报告的原目标偏差”结论。
+2. **原始-objective 版本**：额外假设 clipping bias 可加和、零均值，或加入单独的 clipping-residual feedback，使 \(\sum_t\mathbb E\|\sum_{s<t}\beta_s\|^2=O(T)\)。否则只能给出“优化 clipped objective 加一个可报告的原目标偏差”结论。
 
-因此，下一版 Candidate Theorem A 不再把 \(\beta_t\) 和压缩误差、投影误差无条件地放进同一个 \(E_t\) 闭合式；会先证明 clipped-objective 版本，再把原始目标偏差作为单独项。完整扫描见 [box_fixed_sigma_sweep_summary.json](../experiments/box_fixed_sigma_sweep_summary.json)。
+因此，下一版 Candidate Theorem A 不再把 \(\beta_t\) 和压缩误差、投影误差无条件地放进同一个 \(E_t\) 闭合式；会先证明 clipped-objective 版本，再把原始目标偏差作为单独项。
 
 ### 8.11 \(E_t\) 闭合引理草案：将理论拆成两个版本
 
@@ -655,48 +652,52 @@ D_t\le K_xM_t+K_\Xi\Xi_t+K_PP_t,
 
 这一区分会成为后续正式证明和 FashionMNIST 实验的入口：先验证版本 A 的条件，再单独测量版本 B 的 clipping bias，而不把两者写成一个无条件收敛结论。
 
-### 8.12 signed projection residual 诊断：修正保守代理的解释
+### 8.12 signed projection residual 诊断：修正理论对象和配置标签
 
-原始 `p3_box_ls_sim.py` 为了在不指定残差方向时保守记录投影误差，把每轮 \(h/e/r\) 投影残差的范数放入 \(E_t\) 的第一坐标。这适合做上界压力测试，但会人为消除不同轮次和不同客户端之间的方向抵消。为避免把该代理误读成理论量，新增 `p3_box_ls_signed_sim.py`，保留真实的 signed residual vector：
+旧版 `p3_box_ls_sim.py` 为了做方向最坏的压力测试，把每轮投影残差的范数同向放入累计量。这一量不是理论中的 \(c_t\)、\(\rho_t\) 或 \(E_t\)，而且会消除不同轮次和不同客户端之间的方向抵消。当前三个模拟器统一记录 signed decomposition：
+
+```text
+c_t    = H_t - mean_i(u_i,t)
+rho_t  = mean_i(u_i,t - v_i,t)
+beta_t = mean_i(v_i,t - raw_mean_i,t)
+E_t    = sum_{s <= t} (c_s + rho_s + beta_s)
+```
+
+投影残差另行按 `raw - new` 存储，并通过 telescoping identity 检查；它们不再被塞进 \(E_t\) 的第一坐标。
+
+历史表格中的 `signed_clipped` 名称具有误导性：该配置实际使用 \(C_0=C_g=100\)，因此关闭了输入/逐样本 clipping，只保留有界状态投影。当前 driver 使用 `signed_unclipped`；旧文件中的 `signed_clipped` 仅作为 legacy label 保留。在 \(B_h=1\) 的状态投影诊断中，修正后的 clipped-objective \(Q_T/T\) 为：
+
+| T | 修正后的 clipped-objective \(Q_T/T\) | 累计 h 投影残差 |
+|---:|---:|---:|
+| 25 | 6.47 | 1.82 |
+| 50 | 6.90 | 3.02 |
+| 100 | 11.58 | 5.78 |
+| 200 | 19.66 | 11.79 |
+
+这些数值是状态投影开始绑定时的压力测试；它们不应与原始输入 clipping bias 混为一谈。历史文件 `box_signed_clipped_sweep_summary.json` 保留作复现线索，但应标注为 legacy，并在新表中同时报告实际的 \(C_0,C_g,B_h,B_e,B_r\) 和配置语义。
+
+### 8.13 无输入 clipping、无状态投影的压缩误差对照（非隐私主结果）
+
+为隔离 Top-K/EControl 的 signed tracking 误差，使用 \(C_0=C_g=B_r=B_e=100\)、\(B_h=10\) 的配置，关闭输入 clipping 和状态投影。该配置的账本报告 \(\varepsilon\approx64\text{--}428\)，因此只能作为近似非私人的压缩诊断，不能作为 \(\varepsilon=8\) 的 DP 效用结果。当前 driver 保留兼容键 `signed_noprojection`，但 manifest label 明确写为“unclipped, no-state-projection, high-epsilon diagnostic”；它不是私有效用 baseline。
+
+按理论 signed decomposition 重新计算后，Top-K 的 clipped-objective \(Q_T/T\) 为：
+
+| T | 修正后的 clipped-objective \(Q_T/T\) | 历史 norm proxy \(Q_T^{\mathrm{proxy}}/T\)（已废弃） |
+|---:|---:|---:|
+| 25 | 3.06 | 11.0 |
+| 50 | 2.49 | 13.2 |
+| 100 | 2.37 | 18.3 |
+| 200 | 2.18 | 29.4 |
+
+修正后的量是平坦或下降的；它不支持“无 clipping、无投影时 \(Q_T/T\) 仍持续增长”的旧结论。该结果也不等于收敛证明：它只说明此前的增长主要由错误的 norm proxy 和配置标签造成。真正需要证明的是，在有界主线中投影残差累计量
 
 \[
-\rho_t
-=
-\frac1n\sum_i(p^h_{i,t}+p^e_{i,t}+p^r_{i,t}),
-\qquad
-E_t\leftarrow E_t+c_t+\rho_t+\beta_t.
+P_T=\sum_{t\le T}\|\bar p^e_t\|+\sum_{t\le T}\|\bar p^r_t\|
 \]
 
-在 clipped-objective 对照中，将样本梯度、\(u\) 和 residual buffer 半径设得足够大，使 \(\beta_t=0\)，并固定逐轮 \(\sigma=0.6932\)。三个随机种子的 DP-TopK 结果为：
+是否为 \(O(T)\)（更强时为 \(O(1)\)），以及它如何进入 Paper 3 的真实迭代不等式。无投影诊断只能验证 \(P_T=0\) 的特例。
 
-| T | 测试 MSE | 平均 movement | \(Q_T/T\) | 最大 \(\|E_t\|\) |
-|---:|---:|---:|---:|---:|
-| 25 | 0.5170 ± 0.1570 | 0.4532 | 4.26 | 2.49 |
-| 50 | 0.9565 ± 0.5439 | 0.4582 | 4.75 | 2.78 |
-| 100 | 0.6256 ± 0.3075 | 0.4555 | 7.85 | 3.77 |
-| 200 | 0.7117 ± 0.2126 | 0.4536 | 12.26 | 5.22 |
-
-这组结果不能直接证明 \(Q_T=O(T)\)，但说明此前 \(Q_T/T\) 从 158.7 增至 2568.7 的大部分增长来自“将残差范数同向累加”的保守代理。后续正式证明和主诊断使用 signed residual；norm proxy 只作为不允许方向抵消的压力测试。
-
-实现与结果：
-
-- [p3_box_ls_signed_sim.py](../code/p3_box_ls_signed_sim.py)
-- [box_signed_clipped_sweep_summary.json](../experiments/box_signed_clipped_sweep_summary.json)
-
-### 8.13 无投影、零 bias 的压缩误差对照
-
-为进一步隔离 Top-K/EControl 本身，使用 signed-residual 模拟器，同时设置足够大的 \(C_0,C_g,B_r,B_h,B_e\)，使梯度 clipping bias 和 \(h/e/r\) 投影残差都为 0；逐轮 \(\sigma=0.6932\) 固定。DP-TopK 三种子结果为：
-
-| T | 测试 MSE | 平均 movement | \(Q_T/T\) | 最大 \(\|E_t\|\) |
-|---:|---:|---:|---:|---:|
-| 25 | 0.4943 ± 0.1425 | 0.4568 | 11.01 | 3.98 |
-| 50 | 0.9794 ± 0.5828 | 0.4611 | 13.22 | 4.55 |
-| 100 | 0.5653 ± 0.2945 | 0.4616 | 18.33 | 5.44 |
-| 200 | 0.7432 ± 0.2589 | 0.4597 | 29.36 | 7.73 |
-
-该对照显示，在 \(\beta_t=0\)、\(\rho_t=0\) 后，\(Q_T/T\) 的增长明显减缓，但在当前有限 horizon 上仍不能拟合成常数。它支持把 EControl 的 Lyapunov 收缩和输入变化项作为真正需要证明的核心，而不是把所有增长归因于 clipping 或投影。完整摘要见 [box_signed_noprojection_sweep_summary.json](../experiments/box_signed_noprojection_sweep_summary.json)。
-
-
+历史摘要 `box_signed_noprojection_sweep_summary.json` 已标为 legacy/superseded；当前 horizon manifest 记录目标/实际 \(\varepsilon\)、每轮 sigma、`C0/Cg`、投影半径、`reference_radius`、`gamma_mode` 和 `iterate_reporting`，而零噪声 sign-stress manifest 单独记录 `sigma_override=0`。这样可避免把该诊断误读成私有训练结果。
 
 ### 8.14 诊断修正与软最大/单纯形交叉核查（2026-10-08）
 
@@ -719,9 +720,9 @@ E_t   = sum_{s <= t} (c_s + rho_s + beta_s)
 
 审计输出见 [`softmax_simplex_telescoping_audit.json`](../experiments/softmax_simplex_telescoping_audit.json)。这不是收敛证明；它只确认实现现在与理论记号一致。softmax 的 `beta_t` 不应被解释为一个已知的梯度场，因而原始目标结论仍需单独处理。
 
-旧版 box horizon sweep 中 `Q_T/T` 的大幅增长主要来自错误的 norm proxy。按理论 signed decomposition 重新计算时，clipped objective 的 `Q_T/T` 在主配置下约为常数（约 0.2 的量级）；原始 least-squares 目标仍显示明显的 clipping bias，这一偏差不能由“每步有界”自动变成 `O(T)` 的累计能量。
+旧版 box horizon sweep 中 `Q_T/T` 的大幅增长主要来自错误的 norm proxy。按理论 signed decomposition 重新计算时，headline 主配置的 clipped objective `Q_T/T` 约为 0.2 的量级；no-projection 诊断则为 3.06→2.18，平坦或下降。原始 least-squares 目标仍显示明显的 clipping bias，这一偏差不能由“每步有界”自动变成 `O(T)` 的累计能量。旧 sweep JSON 只作 legacy 复现线索，不再作为理论证据。
 
-同时，旧版 utility knee 不能直接作为方法不稳定的证据：它使用固定 gamma=5 和 last iterate，而理论草案分析的是 averaged iterate 与随 horizon 调整的正则化尺度。后续 sweep 必须把 `gamma_protocol`、`iterate_report`、每轮 sigma、C0/Cg/Bh/Be/Br、seeds、accountant 和总 bit budget 写入 JSON metadata，并分别报告固定逐轮噪声与固定总 epsilon 两种 protocol。
+同时，旧版 utility knee 不能直接作为方法不稳定的证据：它只使用固定 gamma=5 和 last iterate，而理论草案分析的是 averaged iterate 与随 horizon 调整的正则化尺度。当前 driver 已支持 `--gamma-mode noise_calibrated`、显式 `--reference-radius`（默认使用通用 `Bbox=2.0`，历史复现才传 1.3）以及 uniform-average 指标；新版 manifest 记录 `gamma_mode`、`reference_radius`、`iterate_reporting`、每轮 sigma、C0/Cg/Bh/Be/Br、seeds、accountant 和总 bit budget。
 
 基线也已按相同敏感度重新核查。dense DA 不发送 Top-K index，因此它的通信量应为 `T*d*32` bits/client；只有 Top-K 才支付 `K*(32+ceil(log2 d))` bits/client。后续表格会同时给出原报告的 C0=1.5 dense baseline 与 matched-sensitivity 的 C0=1.0 baseline，避免把中心 DP 的 `2*C0/n` 敏感度差异误报为压缩收益。
 
