@@ -1,0 +1,99 @@
+# Independent c/rho/beta/E audit: softmax and simplex simulators
+
+Date: 2026-10-07 UTC  
+Source modules: `p3_softmax_sim.py`, `p3_simplex_logistic_sim.py`  
+Checker: `tele_scope_softmax_simplex_audit.py`  
+Result JSON: `tele_scope_softmax_simplex_audit.json`
+
+## Scope
+
+The checker instruments the current compressed EControl implementations without changing their source. For every client and round it independently reconstructs the local update, calls the simulator's own update, and compares the resulting states.
+
+The theorem convention checked is
+
+\[
+c_t=H_t-\bar u_t,\qquad
+\rho_t=\bar u_t-\bar v_t,\qquad
+\beta_t=\bar v_t-\bar g_t,
+\]
+
+where `raw_mean` is the unclipped per-client gradient mean, and
+
+\[
+E_t=\sum_{s\le t}(c_s+\rho_s+\beta_s).
+\]
+
+## Configurations
+
+Three seeds (`0,1,2`) were checked for each of:
+
+- softmax + \(\ell_1\): (n=20), (d=8), (C=3), (T=80), Top-K fraction (0.1);
+- simplex logistic: (n=20), (d=8), (T=100), Top-K fraction (0.2);
+- both non-private and central-DP versions;
+- (C_0=C_g=1.5), (B_r=2), (B_h=1), (B_e=2), full participation (q=1).
+
+## Results
+
+All values are maximum absolute or infinity-norm discrepancies over the full trajectory and all three seeds.
+
+| Check | Softmax | Simplex |
+|---|---:|---:|
+| independently reconstructed local state vs simulator | 0 | 0 |
+| algebra `(c + rho + beta) = mean(h_new - raw_mean)` | (5.6\times10^{-17}) | (3.5\times10^{-17}) |
+| c telescoping | (9.1\times10^{-17}) | (1.7\times10^{-17}) |
+| rho telescoping | 0 | 0 |
+| history c/rho/beta fields | (1.2\times10^{-16}) | (7.0\times10^{-17}) |
+| history E norm | (3.6\times10^{-15}) | (8.9\times10^{-16}) |
+| history E squared norm | (5.7\times10^{-14}) | (7.1\times10^{-15}) |
+| final code E vs independently reconstructed E | (2.3\times10^{-15}) | (8.0\times10^{-16}) |
+
+Thus the current softmax and simplex simulators both track the theorem's (c_t,\rho_t,\beta_t,E_t) quantities exactly up to floating-point error.
+
+## Projection-residual sign convention
+
+The current code stores each projection residual as `raw - new`:
+
+```text
+h_clip_vec = h_raw - h_new
+e_clip_vec = e_raw - e_new
+r_clip_vec = r_raw - r_new
+```
+
+With initial (e_0=r_0=0), the exact telescoping identities for this code convention are
+
+\[
+\sum_{s\le t}c_s
+=\bar e_t+\sum_{s\le t}\bar p^e_s,
+\qquad
+\sum_{s\le t}\rho_s
+=-\bar r_t-\sum_{s\le t}\bar p^r_s,
+\]
+
+where (p^e=e_{\rm raw}-e_{\rm new}) and (p^r=r_{\rm raw}-r_{\rm new}).
+
+If the proof instead defines residuals as `new - raw`, the equivalent formulas are
+
+\[
+\sum_{s\le t}c_s
+=\bar e_t-\sum_{s\le t}\bar p^e_s,
+\qquad
+\sum_{s\le t}\rho_s
+=-\bar r_t+\sum_{s\le t}\bar p^r_s.
+\]
+
+The theory documents should choose one convention and use it consistently. Under the current headline configurations, all (h/e/r) projection residuals are zero, so the two conventions are numerically indistinguishable; a stress configuration with active projections is needed to catch a sign error experimentally.
+
+## Legacy proxy note
+
+The checker also computes the older diagnostic based on `delta - TopK(delta)` plus scalar projection norms. That legacy proxy can differ by infinity-norm values of roughly 1.36–17.25 for softmax and 3.72–10.46 for simplex. It is not the current simulator's (E_t) and should not be used in the theorem or headline (Q_T) claims.
+
+## Active-projection sign stress test
+
+To make the sign issue observable, a separate clean run used (T=40), σ=0, (C_g=0.25), (B_h=0.10), (B_e=0.05), (B_r=0.05). The correct formulas remained at floating-point error, while applying the wrong sign to the code's `raw-new` residuals produced:
+
+| Task | Correct c error | Correct rho error | Wrong c sign gap | Wrong rho sign gap |
+|---|---:|---:|---:|---:|
+| Softmax | (6.7\times10^{-16}) | (6.7\times10^{-16}) | 4.02 | 4.14 |
+| Simplex | (3.3\times10^{-16}) | (2.8\times10^{-17}) | 2.18 | 0.151 |
+
+The compact stress output is `tele_scope_sign_stress.json`.

@@ -447,6 +447,13 @@ class BoundedPrivateEControlDA:
         pred = np.where(Xtest @ self.x >= 0, 1.0, -1.0)
         acc = float(np.mean(pred == ytest))
         loss = float(logistic_loss_and_grad(Xtest, ytest, self.x)[0] + self.cfg.l1 * np.abs(self.x).sum())
+        # Top-K messages carry an index for every transmitted value.  Dense
+        # messages transmit every coordinate and therefore carry no Top-K
+        # indices.  Keeping this distinction explicit avoids charging dense
+        # baselines for metadata they do not send.
+        values_per_round = self.k if self.compression else self.d
+        bits_per_value = 32 + int(np.ceil(np.log2(max(self.d, 2)))) if self.compression else 32
+        bits_per_client = self.cfg.rounds * self.m / self.n * values_per_round * bits_per_value
         return {
             "objective": loss,
             "accuracy": acc,
@@ -457,12 +464,8 @@ class BoundedPrivateEControlDA:
             "delta": self.cfg.delta_dp if self.cfg.private else 0.0,
             "accounted_epsilon": self.accounted_epsilon(),
             "active_count": self.m,
-            "bits_total": self.cfg.rounds * self.m
-            * (self.k if self.compression else self.d)
-            * (32 + int(np.ceil(np.log2(self.d)))),
-            "bits_per_client": self.cfg.rounds * self.m / self.n
-            * (self.k if self.compression else self.d)
-            * (32 + int(np.ceil(np.log2(self.d)))),
+            "bits_total": int(self.n * bits_per_client),
+            "bits_per_client": int(bits_per_client),
             "sampling_rate": self.m / self.n,
             "accountant_q": self.accountant_q,
             "history": self.history,

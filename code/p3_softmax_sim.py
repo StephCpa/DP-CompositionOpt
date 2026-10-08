@@ -142,6 +142,10 @@ class SoftmaxEControlDA:
         self.G = np.zeros(self.D)
         self.A = 0.0
         self.t = 0
+        # The theorem-aligned cumulative error uses c_t + rho_t + beta_t.
+        # Projection residuals are recorded separately because they enter the
+        # telescoping identity through the local state updates.
+        self._E = np.zeros(self.D)
 
         # Full participation: one client replacement changes one bounded local
         # state in an n-way average, hence sensitivity 2 Bh / n.  The dense
@@ -190,11 +194,12 @@ class SoftmaxEControlDA:
         _, per = softmax_loss_and_grad(X, y, self.W, self.n_classes)
         clipped = clip_rows(per, self.cfg.C0)
         v = clipped.mean(axis=0)
+        raw_mean = per.mean(axis=0)
         frac = float(np.mean(np.linalg.norm(per, axis=1) > self.cfg.C0))
-        return v, per, frac
+        return v, raw_mean, frac
 
     def _local_update(self, i: int):
-        v, _, clipping_fraction = self._clipped_gradient(i)
+        v, raw_mean, clipping_fraction = self._clipped_gradient(i)
         rbar = clip_vec(self.r[i], self.cfg.Br) if self.cfg.residual_buffer else np.zeros(self.D)
         u = clip_vec(v + rbar, self.cfg.Cg)
         hbar = clip_vec(self.h[i], self.cfg.Bh)
@@ -218,6 +223,12 @@ class SoftmaxEControlDA:
             "e_clip_residual": float(np.linalg.norm(e_raw - e_new)),
             "r_norm": float(np.linalg.norm(r_new)),
             "e_norm": float(np.linalg.norm(e_new)),
+            "h_clip_vec": h_raw - h_new,
+            "e_clip_vec": e_raw - e_new,
+            "r_clip_vec": r_raw - r_new,
+            "u_vec": u.copy(),
+            "v_vec": v.copy(),
+            "raw_mean_vec": raw_mean.copy(),
         }
         self.h[i], self.e[i], self.r[i] = h_new, e_new, r_new
         return diagnostics
@@ -231,7 +242,7 @@ class SoftmaxEControlDA:
             local_stats = []
             gs = []
             for i in active:
-                v, _, frac = self._clipped_gradient(int(i))
+                v, raw_mean, frac = self._clipped_gradient(int(i))
                 gs.append(v)
                 local_stats.append(
                     {
@@ -241,9 +252,27 @@ class SoftmaxEControlDA:
                         "e_clip_residual": 0.0,
                         "r_norm": 0.0,
                         "e_norm": 0.0,
+                        "h_clip_vec": np.zeros(self.D),
+                        "e_clip_vec": np.zeros(self.D),
+                        "r_clip_vec": np.zeros(self.D),
+                        "u_vec": v.copy(),
+                        "v_vec": v.copy(),
+                        "raw_mean_vec": raw_mean.copy(),
                     }
                 )
             h_clean = np.mean(gs, axis=0)
+
+        u_bar = np.mean([s["u_vec"] for s in local_stats], axis=0)
+        v_bar = np.mean([s["v_vec"] for s in local_stats], axis=0)
+        raw_bar = np.mean([s["raw_mean_vec"] for s in local_stats], axis=0)
+        c_vec = h_clean - u_bar
+        rho_vec = u_bar - v_bar
+        beta_vec = v_bar - raw_bar
+        projection_vec = np.mean(
+            [s["h_clip_vec"] + s["e_clip_vec"] + s["r_clip_vec"] for s in local_stats],
+            axis=0,
+        )
+        self._E += c_vec + rho_vec + beta_vec
 
         # Fresh aggregate noise is added to the current clean estimate.  The
         # noisy release is never fed into a second server-side accumulator.
@@ -264,6 +293,16 @@ class SoftmaxEControlDA:
                 "e_clip_residual": float(np.mean([s["e_clip_residual"] for s in local_stats])),
                 "r_norm": float(np.mean([s["r_norm"] for s in local_stats])),
                 "e_norm": float(np.mean([s["e_norm"] for s in local_stats])),
+                "c_t_norm": float(np.linalg.norm(c_vec)),
+                "c_t_vec": c_vec.tolist(),
+                "rho_t": float(np.linalg.norm(rho_vec)),
+                "rho_t_vec": rho_vec.tolist(),
+                "beta_t_norm": float(np.linalg.norm(beta_vec)),
+                "beta_t_vec": beta_vec.tolist(),
+                "E_t_norm": float(np.linalg.norm(self._E)),
+                "E_t_sq": float(np.dot(self._E, self._E)),
+                "E_t_vec": self._E.tolist(),
+                "projection_residual_signed_norm": float(np.linalg.norm(projection_vec)),
             }
         )
         self.t += 1
@@ -280,7 +319,11 @@ class SoftmaxEControlDA:
         bits_per_value = 32
         index_bits = int(np.ceil(np.log2(max(self.D, 2))))
         values_per_round = self.k if self.cfg.compression else self.D
-        bits_per_client = self.cfg.rounds * values_per_round * (bits_per_value + index_bits)
+        # Dense DA sends all coordinates and no Top-K indices.
+        bits_per_client = self.cfg.rounds * (
+            values_per_round * (bits_per_value + index_bits)
+            if self.cfg.compression else self.D * bits_per_value
+        )
         return {
             "objective": objective,
             "cross_entropy": float(loss),
@@ -307,12 +350,19 @@ class SoftmaxEControlDA:
             "e_clip_residual": float(last["e_clip_residual"]),
             "r_norm": float(last["r_norm"]),
             "e_norm": float(last["e_norm"]),
+            "mean_c_t_norm": float(np.mean([h["c_t_norm"] for h in self.history])),
+            "mean_rho_t": float(np.mean([h["rho_t"] for h in self.history])),
+            "mean_beta_t_norm": float(np.mean([h["beta_t_norm"] for h in self.history])),
+            "mean_E_t_norm": float(np.mean([h["E_t_norm"] for h in self.history])),
+            "max_E_t_norm": float(np.max([h["E_t_norm"] for h in self.history])),
+            "sum_E_t_sq": float(np.sum([h["E_t_sq"] for h in self.history])),
             "residuals": {
                 "clipping_fraction": float(last["clipping_fraction"]),
                 "h_clip_residual": float(last["h_clip_residual"]),
                 "e_clip_residual": float(last["e_clip_residual"]),
                 "r_norm": float(last["r_norm"]),
                 "e_norm": float(last["e_norm"]),
+                "projection_residual_signed_norm": float(last["projection_residual_signed_norm"]),
             },
             "history": self.history,
         }
@@ -352,6 +402,13 @@ def run_suite(args):
         "centralDP_bounded_EControl_TopK": Config(**common, private=True, compression=True),
         "centralDP_DA_no_compression": Config(**common, private=True, compression=False),
     }
+    dense_c0 = getattr(args, "dense_C0", None)
+    if dense_c0 is not None:
+        dense_common = dict(common)
+        dense_common["C0"] = float(dense_c0)
+        configs["centralDP_DA_no_compression_matched_sensitivity"] = Config(
+            **dense_common, private=True, compression=False
+        )
     results = {}
     for name, cfg in configs.items():
         result = SoftmaxEControlDA(clients, cfg).run(test)
@@ -381,6 +438,8 @@ def main():
     ap.add_argument("--gamma", type=float, default=5.0)
     ap.add_argument("--l1", type=float, default=0.002)
     ap.add_argument("--C0", type=float, default=1.5)
+    ap.add_argument("--dense-C0", type=float, default=None,
+                    help="optional matched-sensitivity C0 for the dense DP baseline")
     ap.add_argument("--Cg", type=float, default=1.5)
     ap.add_argument("--Br", type=float, default=2.0)
     ap.add_argument("--Bh", type=float, default=1.0)

@@ -840,3 +840,29 @@ Q_T\le K_E T.
 5. 将 `EF-3` 代入 Paper 3 真实迭代不等式，核对吸收系数；
 6. 在固定 `sigma` 和固定总 epsilon 两种 protocol 下分别估计 `K_E`；
 7. 只有当前述条件通过后，才把 FashionMNIST 作为高维实验，而不是先用大模型实验掩盖闭合缺口。
+
+## 13. 实现对齐后的 signed residual 约定（2026-10-08）
+
+当前三个模拟器把投影残差按 `raw - new` 存储：
+
+```text
+p_e = e_raw - e_new
+p_r = r_raw - r_new
+p_h = h_raw - h_new
+```
+
+在 e_0=r_0=0 且全参与时，逐轮代数恒等式给出：
+
+```text
+sum_{s <= t} c_s   = mean(e_t) + sum_{s <= t} mean(p_e,s)
+sum_{s <= t} rho_s = -mean(r_t) - sum_{s <= t} mean(p_r,s)
+```
+
+如果证明草稿把投影残差定义成 `new - raw`，则相同恒等式写成：
+
+```text
+sum c_s   = mean(e_t) - sum mean(p_e,s)
+sum rho_s = -mean(r_t) + sum mean(p_r,s)
+```
+
+这只是符号约定，但在 projection residual 不为零时不能混用。独立 sign-stress 运行（softmax 与 simplex 都缩小 Cg、Bh、Be、Br 以激活投影）在正确约定下的 telescoping 误差仍小于 7e-16；把 `raw-new` 当成 `new-raw` 会产生 1e-1 到 1 量级的误差。对应记录见 [`tele_scope_sign_stress.json`](../experiments/tele_scope_sign_stress.json)。后续证明统一使用上面的 `raw - new` 定义，或在代码中先显式取负，不能再把投影残差范数放入 `E_t` 的第一坐标。

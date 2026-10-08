@@ -1,0 +1,287 @@
+{
+  "metadata": {
+    "purpose": "algebraic audit of theorem-aligned signed diagnostics",
+    "definition": {
+      "c_t": "H_t - mean_i(u_i,t)",
+      "rho_t": "mean_i(u_i,t - v_i,t)",
+      "beta_t": "mean_i(v_i,t - raw_mean_i,t)",
+      "E_t": "sum_{s<=t}(c_s + rho_s + beta_s)"
+    },
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "rounds": 80,
+    "scope_note": "Algebraic audit only; no convergence or privacy proof."
+  },
+  "results": {
+    "box": {
+      "nonprivate_bounded_EControl_TopK": [
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 3576.501988449789,
+          "Q_T_clipped": 5.796895328378397,
+          "Q_T_over_T": 44.70627485562237,
+          "Q_T_clipped_over_T": 0.07246119160472995,
+          "max_E_t_norm": 7.084873562795403
+        },
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 4818.8941981746275,
+          "Q_T_clipped": 6.624631436133771,
+          "Q_T_over_T": 60.23617747718284,
+          "Q_T_clipped_over_T": 0.08280789295167214,
+          "max_E_t_norm": 8.230634034312132
+        },
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 4617.7844754098205,
+          "Q_T_clipped": 4.44496239094582,
+          "Q_T_over_T": 57.722305942622754,
+          "Q_T_clipped_over_T": 0.05556202988682275,
+          "max_E_t_norm": 8.022543678795886
+        }
+      ],
+      "centralDP_bounded_EControl_TopK": [
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 11780.393480675095,
+          "Q_T_clipped": 22.563115574680214,
+          "Q_T_over_T": 147.2549185084387,
+          "Q_T_clipped_over_T": 0.28203894468350266,
+          "max_E_t_norm": 17.201058628445576
+        },
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 40143.930990237845,
+          "Q_T_clipped": 19.33671032059396,
+          "Q_T_over_T": 501.79913737797307,
+          "Q_T_clipped_over_T": 0.2417088790074245,
+          "max_E_t_norm": 30.747064306011133
+        },
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 85438.60874069891,
+          "Q_T_clipped": 13.485832002771525,
+          "Q_T_over_T": 1067.9826092587364,
+          "Q_T_clipped_over_T": 0.16857290003464406,
+          "max_E_t_norm": 52.07303825387136
+        }
+      ],
+      "centralDP_DA_no_compression": [
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 53436.90250800047,
+          "Q_T_clipped": 0.0,
+          "Q_T_over_T": 667.961281350006,
+          "Q_T_clipped_over_T": 0.0,
+          "max_E_t_norm": 41.09262201758476
+        },
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 183139.07800498168,
+          "Q_T_clipped": 0.0,
+          "Q_T_over_T": 2289.238475062271,
+          "Q_T_clipped_over_T": 0.0,
+          "max_E_t_norm": 76.6453659889173
+        },
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 368581.3501532945,
+          "Q_T_clipped": 0.0,
+          "Q_T_over_T": 4607.266876916181,
+          "Q_T_clipped_over_T": 0.0,
+          "max_E_t_norm": 123.8385499547189
+        }
+      ]
+    },
+    "simplex": {
+      "nonprivate_bounded_EControl_TopK": [
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 190.63836168007313,
+          "Q_T_clipped": 0.0035374331429932487,
+          "Q_T_over_T": 2.382979521000914,
+          "Q_T_clipped_over_T": 4.4217914287415606e-05,
+          "max_E_t_norm": 2.7499849188758887
+        },
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 175.58372504514688,
+          "Q_T_clipped": 0.007888653459520223,
+          "Q_T_over_T": 2.194796563064336,
+          "Q_T_clipped_over_T": 9.860816824400278e-05,
+          "max_E_t_norm": 2.5814901114873554
+        },
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 163.40548231529695,
+          "Q_T_clipped": 0.005690247980641599,
+          "Q_T_over_T": 2.042568528941212,
+          "Q_T_clipped_over_T": 7.112809975801999e-05,
+          "max_E_t_norm": 2.479514531385525
+        }
+      ],
+      "centralDP_bounded_EControl_TopK": [
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 367.26500830126537,
+          "Q_T_clipped": 0.021060816440624627,
+          "Q_T_over_T": 4.5908126037658175,
+          "Q_T_clipped_over_T": 0.00026326020550780784,
+          "max_E_t_norm": 4.1700116922747705
+        },
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 360.03507020943704,
+          "Q_T_clipped": 0.03855748862853437,
+          "Q_T_over_T": 4.500438377617963,
+          "Q_T_clipped_over_T": 0.00048196860785667964,
+          "max_E_t_norm": 3.42179188925514
+        },
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 221.91291454433434,
+          "Q_T_clipped": 0.027462474627664723,
+          "Q_T_over_T": 2.773911431804179,
+          "Q_T_clipped_over_T": 0.000343280932845809,
+          "max_E_t_norm": 2.9278484043123876
+        }
+      ],
+      "centralDP_DA_no_compression": [
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 431.0615745380346,
+          "Q_T_clipped": 0.0,
+          "Q_T_over_T": 5.388269681725433,
+          "Q_T_clipped_over_T": 0.0,
+          "max_E_t_norm": 4.518754886159793
+        },
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 370.957761387257,
+          "Q_T_clipped": 0.0,
+          "Q_T_over_T": 4.636972017340712,
+          "Q_T_clipped_over_T": 0.0,
+          "max_E_t_norm": 3.462090257288822
+        },
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 241.47993089411943,
+          "Q_T_clipped": 0.0,
+          "Q_T_over_T": 3.018499136176493,
+          "Q_T_clipped_over_T": 0.0,
+          "max_E_t_norm": 3.020668910721937
+        }
+      ]
+    },
+    "softmax": {
+      "nonprivate_bounded_EControl_TopK": [
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 98.73264144803436,
+          "Q_T_clipped": 3.2122264849103974,
+          "Q_T_over_T": 1.2341580181004295,
+          "Q_T_clipped_over_T": 0.04015283106137997,
+          "max_E_t_norm": 1.4583982587511597
+        },
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 142.5942829632179,
+          "Q_T_clipped": 3.5510323724109947,
+          "Q_T_over_T": 1.7824285370402237,
+          "Q_T_clipped_over_T": 0.044387904655137436,
+          "max_E_t_norm": 2.0035810192121057
+        },
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 126.15426667118471,
+          "Q_T_clipped": 2.9588518635963643,
+          "Q_T_over_T": 1.576928333389809,
+          "Q_T_clipped_over_T": 0.03698564829495456,
+          "max_E_t_norm": 1.7241228826275314
+        }
+      ],
+      "centralDP_bounded_EControl_TopK": [
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 6480.36871069493,
+          "Q_T_clipped": 5.035216999871967,
+          "Q_T_over_T": 81.00460888368663,
+          "Q_T_clipped_over_T": 0.06294021249839958,
+          "max_E_t_norm": 13.98867728655989
+        },
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 3612.105721077935,
+          "Q_T_clipped": 3.6600621600622265,
+          "Q_T_over_T": 45.15132151347419,
+          "Q_T_clipped_over_T": 0.04575077700077783,
+          "max_E_t_norm": 11.084713835659564
+        },
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 5872.837746861582,
+          "Q_T_clipped": 5.042738270205028,
+          "Q_T_over_T": 73.41047183576977,
+          "Q_T_clipped_over_T": 0.06303422837756285,
+          "max_E_t_norm": 12.755276271157758
+        }
+      ],
+      "centralDP_DA_no_compression": [
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 13466.471306018891,
+          "Q_T_clipped": 0.0,
+          "Q_T_over_T": 168.33089132523614,
+          "Q_T_clipped_over_T": 0.0,
+          "max_E_t_norm": 21.25737193469939
+        },
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 6520.397882193073,
+          "Q_T_clipped": 0.0,
+          "Q_T_over_T": 81.50497352741341,
+          "Q_T_clipped_over_T": 0.0,
+          "max_E_t_norm": 15.2454219292019
+        },
+        {
+          "rounds": 80,
+          "max_E_identity_error": 0.0,
+          "Q_T": 13293.526152736973,
+          "Q_T_clipped": 0.0,
+          "Q_T_over_T": 166.16907690921215,
+          "Q_T_clipped_over_T": 0.0,
+          "max_E_t_norm": 20.688892488681198
+        }
+      ]
+    }
+  }
+}

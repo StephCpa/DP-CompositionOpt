@@ -202,8 +202,14 @@ class SimplexLogisticEControlDA:
             "clipping_fraction": frac,
             "message_norm": float(np.linalg.norm(q)),
             "h_clip": h_clip, "e_clip": e_clip, "r_clip": r_clip,
+            "h_clip_vec": h_raw - h_new,
+            "e_clip_vec": e_raw - e_new,
+            "r_clip_vec": r_raw - r_new,
+            "u_vec": u.copy(),
+            "v_vec": v.copy(),
+            "raw_mean_vec": raw_mean.copy(),
             "compression_residual_vec": delta - q,
-            "clipping_bias_vec": raw_mean - v,
+            "clipping_bias_vec": v - raw_mean,
         }
 
     def step(self):
@@ -221,8 +227,14 @@ class SimplexLogisticEControlDA:
                 stats.append({
                     "clipping_fraction": frac, "message_norm": 0.0,
                     "h_clip": 0.0, "e_clip": 0.0, "r_clip": 0.0,
+                    "h_clip_vec": np.zeros(self.d),
+                    "e_clip_vec": np.zeros(self.d),
+                    "r_clip_vec": np.zeros(self.d),
+                    "u_vec": v.copy(),
+                    "v_vec": v.copy(),
+                    "raw_mean_vec": raw.copy(),
                     "compression_residual_vec": np.zeros(self.d),
-                    "clipping_bias_vec": raw - v,
+                    "clipping_bias_vec": v - raw,
                 })
             h_clean = np.mean(gs, axis=0)
         z = self.rng.normal(scale=self.sigma, size=self.d)
@@ -230,11 +242,17 @@ class SimplexLogisticEControlDA:
         self.G += released
         self.w = self._prox_da()
 
-        c_vec = np.mean([s["compression_residual_vec"] for s in stats], axis=0)
-        beta_vec = np.mean([s["clipping_bias_vec"] for s in stats], axis=0)
-        rho_scalar = float(np.mean([s["h_clip"] + s["e_clip"] + s["r_clip"] for s in stats]))
-        self._E += c_vec + beta_vec
-        self._E[0] += rho_scalar
+        u_bar = np.mean([s["u_vec"] for s in stats], axis=0)
+        v_bar = np.mean([s["v_vec"] for s in stats], axis=0)
+        raw_bar = np.mean([s["raw_mean_vec"] for s in stats], axis=0)
+        c_vec = h_clean - u_bar
+        rho_vec = u_bar - v_bar
+        beta_vec = v_bar - raw_bar
+        projection_vec = np.mean(
+            [s["h_clip_vec"] + s["e_clip_vec"] + s["r_clip_vec"] for s in stats],
+            axis=0,
+        )
+        self._E += c_vec + rho_vec + beta_vec
         age = self.t + 1 - self.last_update
         self.history.append({
             "round": float(self.t + 1),
@@ -254,10 +272,15 @@ class SimplexLogisticEControlDA:
             "max_state_age": float(np.max(age)),
             "movement": float(np.linalg.norm(self.w - old_w)),
             "c_t_norm": float(np.linalg.norm(c_vec)),
-            "rho_t": rho_scalar,
+            "c_t_vec": c_vec.tolist(),
+            "rho_t": float(np.linalg.norm(rho_vec)),
+            "rho_t_vec": rho_vec.tolist(),
             "beta_t_norm": float(np.linalg.norm(beta_vec)),
+            "beta_t_vec": beta_vec.tolist(),
+            "projection_residual_signed_norm": float(np.linalg.norm(projection_vec)),
             "E_t_norm": float(np.linalg.norm(self._E)),
             "E_t_sq": float(np.dot(self._E, self._E)),
+            "E_t_vec": self._E.tolist(),
             "simplex_sum_error": float(abs(self.w.sum() - 1.0)),
             "simplex_min": float(self.w.min()),
         })
@@ -277,7 +300,10 @@ class SimplexLogisticEControlDA:
         bits_value = 32
         index_bits = int(np.ceil(np.log2(max(self.d, 2))))
         values = self.k if self.cfg.compression else self.d
-        bits_per_client = self.cfg.rounds * values * (bits_value + index_bits)
+        bits_per_client = self.cfg.rounds * (
+            values * (bits_value + index_bits)
+            if self.cfg.compression else self.d * bits_value
+        )
         return {
             "objective": float(test_loss), "accuracy": acc,
             "train_objective": float(train_loss),
@@ -323,6 +349,13 @@ def run_one(seed: int, args: argparse.Namespace):
         "centralDP_bounded_EControl_TopK": Config(**common, private=True, compression=True),
         "centralDP_DA_no_compression": Config(**common, private=True, compression=False),
     }
+    dense_c0 = getattr(args, "dense_C0", None)
+    if dense_c0 is not None:
+        dense_common = dict(common)
+        dense_common["C0"] = float(dense_c0)
+        configs["centralDP_DA_no_compression_matched_sensitivity"] = Config(
+            **dense_common, private=True, compression=False
+        )
     return {name: SimplexLogisticEControlDA(clients, cfg).run(test, w_true)
             | {"seed": int(seed)} for name, cfg in configs.items()}
 
@@ -349,6 +382,8 @@ def summarize(all_results):
 def run_suite(args):
     proj_err, grad_err = simplex_projection_check(args.seed)
     names = ["nonprivate_bounded_EControl_TopK", "centralDP_bounded_EControl_TopK", "centralDP_DA_no_compression"]
+    if getattr(args, "dense_C0", None) is not None:
+        names.append("centralDP_DA_no_compression_matched_sensitivity")
     runs = {name: [] for name in names}
     for seed in range(args.seed, args.seed + args.n_seeds):
         result = run_one(seed, args)
@@ -388,6 +423,8 @@ def main():
     ap.add_argument("--delta-dp", type=float, default=1e-5)
     ap.add_argument("--gamma", type=float, default=5.0)
     ap.add_argument("--C0", type=float, default=1.5)
+    ap.add_argument("--dense-C0", type=float, default=None,
+                    help="optional matched-sensitivity C0 for the dense DP baseline")
     ap.add_argument("--Cg", type=float, default=1.5)
     ap.add_argument("--Br", type=float, default=2.0)
     ap.add_argument("--Bh", type=float, default=1.0)

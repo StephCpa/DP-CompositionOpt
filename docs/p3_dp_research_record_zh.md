@@ -304,8 +304,8 @@ y_t=h_t^{\mathrm{act}}+z_t,
 
 当前模拟器文件：
 
-- [`p3_bounded_sim.py`](sandbox:/workspace/scratch/e96f6d2ea6f1/p3_bounded_sim.py)：合成二分类逻辑回归、\(\ell_1\) 复合项、有界 EControl + Top-K、中心 DP DA、有限前缀 FTRL 参考、固定大小客户端采样、状态年龄和 RDP 账本；
-- [`p3_adversarial.py`](sandbox:/workspace/scratch/e96f6d2ea6f1/p3_adversarial.py)：针对原始未截断 EControl 的有限维对抗性敏感度搜索。
+- [`p3_bounded_sim.py`](../code/p3_bounded_sim.py)：合成二分类逻辑回归、\(\ell_1\) 复合项、有界 EControl + Top-K、中心 DP DA、有限前缀 FTRL 参考、固定大小客户端采样、状态年龄和 RDP 账本；
+- [`p3_adversarial.py`](../code/p3_adversarial.py)：针对原始未截断 EControl 的有限维对抗性敏感度搜索。
 
 模拟器的输出至少包含：目标函数、测试准确率、\(\sigma\)、单轮敏感度、核算后的 \(\varepsilon\)、总比特数、客户端平均比特数、状态年龄、消息范数、梯度裁剪比例、状态/前缀截断残差。
 
@@ -557,8 +557,8 @@ softmax 梯度有限差分检查的最大绝对误差约为 \(10^{-7}\)。
 
 和 softmax+\(\ell_1\) 的结果合在一起，现阶段可以把“机制迁移到多个凸复合目标”写成可复现实验事实；理论表述仍应保持条件式：需要进一步证明或假设 \(\sum_{t\le T} \mathbb E\|E_t\|^2=O(T)\)，才能从 Paper 3 的真实迭代不等式推出标准的平均收敛率。盒约束版本的代码和完整逐轮账本见：
 
-- [p3_box_ls_sim.py](sandbox:/workspace/scratch/e96f6d2ea6f1/p3_box_ls_sim.py)
-- [box_ls_results.json](sandbox:/workspace/scratch/e96f6d2ea6f1/box_ls_results.json)
+- [p3_box_ls_sim.py](../code/p3_box_ls_sim.py)
+- [box_ls_results.json](../experiments/box_ls_results.json)
 
 ### 8.8 固定总隐私预算下的 T 扫描：不能把 O(T) 条件直接外推
 
@@ -591,12 +591,12 @@ softmax 梯度有限差分检查的最大绝对误差约为 \(10^{-7}\)。
 
 实现与完整逐轮结果：
 
-- [p3_simplex_logistic_sim.py](sandbox:/workspace/scratch/e96f6d2ea6f1/p3_simplex_logistic_sim.py)
-- [simplex_logistic_results.json](sandbox:/workspace/scratch/e96f6d2ea6f1/simplex_logistic_results.json)
+- [p3_simplex_logistic_sim.py](../code/p3_simplex_logistic_sim.py)
+- [simplex_logistic_results.json](../experiments/simplex_logistic_results.json)
 
 ## 12. 跨目标条件表
 
-已将 softmax+\(\ell_1\)、box least squares 与 simplex logistic 的 \(L\)、梯度半径、prox/投影非扩张性、movement-coupled \(E_t\) 和最低账本字段整理成单独核查表：[p3_cross_objective_conditions_zh.md](sandbox:/workspace/scratch/e96f6d2ea6f1/p3_cross_objective_conditions_zh.md)。该表是进入 FashionMNIST 前的理论审计入口。
+已将 softmax+\(\ell_1\)、box least squares 与 simplex logistic 的 \(L\)、梯度半径、prox/投影非扩张性、movement-coupled \(E_t\) 和最低账本字段整理成单独核查表：[p3_cross_objective_conditions_zh.md](p3_cross_objective_conditions_zh.md)。该表是进入 FashionMNIST 前的理论审计入口。
 
 ### 8.10 固定逐轮 \(\sigma\) 对照：持续 clipping bias 是第二个闭合障碍
 
@@ -620,11 +620,11 @@ softmax 梯度有限差分检查的最大绝对误差约为 \(10^{-7}\)。
 1. **Clipped-objective 版本**：把被 clipping 后的梯度定义为目标函数的随机 oracle，令 \(\beta_t=0\)，先证明 bounded EControl + DP fresh release 对 clipped objective 的条件式真实迭代界；
 2. **原始-objective 版本**：额外假设 clipping bias 可加和、零均值，或加入单独的 clipping-residual feedback，使 \(\sum_t\mathbb E\|\sum_{s<t}\beta_s\|^2\)=O(T)\)。否则只能给出“优化 clipped objective 加一个可报告的原目标偏差”结论。
 
-因此，下一版 Candidate Theorem A 不再把 \(\beta_t\) 和压缩误差、投影误差无条件地放进同一个 \(E_t\) 闭合式；会先证明 clipped-objective 版本，再把原始目标偏差作为单独项。完整扫描见 [box_fixed_sigma_sweep_summary.json](sandbox:/workspace/scratch/e96f6d2ea6f1/box_fixed_sigma_sweep_summary.json)。
+因此，下一版 Candidate Theorem A 不再把 \(\beta_t\) 和压缩误差、投影误差无条件地放进同一个 \(E_t\) 闭合式；会先证明 clipped-objective 版本，再把原始目标偏差作为单独项。完整扫描见 [box_fixed_sigma_sweep_summary.json](../experiments/box_fixed_sigma_sweep_summary.json)。
 
 ### 8.11 \(E_t\) 闭合引理草案：将理论拆成两个版本
 
-已将 movement-coupled 闭合链整理成独立草案：[p3_Et_closure_lemma_zh.md](sandbox:/workspace/scratch/e96f6d2ea6f1/p3_Et_closure_lemma_zh.md)。核心候选链为
+已将 movement-coupled 闭合链整理成独立草案：[p3_Et_closure_lemma_zh.md](p3_Et_closure_lemma_zh.md)。核心候选链为
 
 \[
 \mathcal C_T
@@ -680,8 +680,8 @@ E_t\leftarrow E_t+c_t+\rho_t+\beta_t.
 
 实现与结果：
 
-- [p3_box_ls_signed_sim.py](sandbox:/workspace/scratch/e96f6d2ea6f1/p3_box_ls_signed_sim.py)
-- [box_signed_clipped_sweep_summary.json](sandbox:/workspace/scratch/e96f6d2ea6f1/box_signed_clipped_sweep_summary.json)
+- [p3_box_ls_signed_sim.py](../code/p3_box_ls_signed_sim.py)
+- [box_signed_clipped_sweep_summary.json](../experiments/box_signed_clipped_sweep_summary.json)
 
 ### 8.13 无投影、零 bias 的压缩误差对照
 
@@ -694,5 +694,39 @@ E_t\leftarrow E_t+c_t+\rho_t+\beta_t.
 | 100 | 0.5653 ± 0.2945 | 0.4616 | 18.33 | 5.44 |
 | 200 | 0.7432 ± 0.2589 | 0.4597 | 29.36 | 7.73 |
 
-该对照显示，在 \(\beta_t=0\)、\(\rho_t=0\) 后，\(Q_T/T\) 的增长明显减缓，但在当前有限 horizon 上仍不能拟合成常数。它支持把 EControl 的 Lyapunov 收缩和输入变化项作为真正需要证明的核心，而不是把所有增长归因于 clipping 或投影。完整摘要见 [box_signed_noprojection_sweep_summary.json](sandbox:/workspace/scratch/e96f6d2ea6f1/box_signed_noprojection_sweep_summary.json)。
+该对照显示，在 \(\beta_t=0\)、\(\rho_t=0\) 后，\(Q_T/T\) 的增长明显减缓，但在当前有限 horizon 上仍不能拟合成常数。它支持把 EControl 的 Lyapunov 收缩和输入变化项作为真正需要证明的核心，而不是把所有增长归因于 clipping 或投影。完整摘要见 [box_signed_noprojection_sweep_summary.json](../experiments/box_signed_noprojection_sweep_summary.json)。
 
+
+
+### 8.14 诊断修正与软最大/单纯形交叉核查（2026-10-08）
+
+复核发现，旧版 horizon 表格把两个不同量混在了一起。理论中的 signed decomposition 是：
+
+```text
+c_t   = H_t - mean_i(u_i,t)
+rho_t = mean_i(u_i,t - v_i,t)
+beta_t = mean_i(v_i,t - raw_mean_i,t)
+E_t   = sum_{s <= t} (c_s + rho_s + beta_s)
+```
+
+其中 `raw_mean` 是未裁剪的逐样本梯度平均。旧模拟器把每条消息的 `delta - TopK(delta)` 当成 `c_t`，并把投影残差范数强行同向累加。现在三个模拟器（box least squares、softmax+l1、simplex logistic）都同时记录上述 signed vector、投影残差和累计 `E_t`。
+
+独立审计在 softmax 和 simplex 上验证了同样的代数恒等式：
+
+- `sum_{s <= t} c_s` 与 `H_t`、`e` 投影残差的理论 telescoping 误差小于 1e-16；
+- `sum_{s <= t} rho_s` 与 residual-buffer 状态的 telescoping 误差小于 1e-16；
+- `E_t` 的逐轮更新与 `c_t + rho_t + beta_t` 的重构误差小于 1e-16。
+
+审计输出见 [`softmax_simplex_telescoping_audit.json`](../experiments/softmax_simplex_telescoping_audit.json)。这不是收敛证明；它只确认实现现在与理论记号一致。softmax 的 `beta_t` 不应被解释为一个已知的梯度场，因而原始目标结论仍需单独处理。
+
+旧版 box horizon sweep 中 `Q_T/T` 的大幅增长主要来自错误的 norm proxy。按理论 signed decomposition 重新计算时，clipped objective 的 `Q_T/T` 在主配置下约为常数（约 0.2 的量级）；原始 least-squares 目标仍显示明显的 clipping bias，这一偏差不能由“每步有界”自动变成 `O(T)` 的累计能量。
+
+同时，旧版 utility knee 不能直接作为方法不稳定的证据：它使用固定 gamma=5 和 last iterate，而理论草案分析的是 averaged iterate 与随 horizon 调整的正则化尺度。后续 sweep 必须把 `gamma_protocol`、`iterate_report`、每轮 sigma、C0/Cg/Bh/Be/Br、seeds、accountant 和总 bit budget 写入 JSON metadata，并分别报告固定逐轮噪声与固定总 epsilon 两种 protocol。
+
+基线也已按相同敏感度重新核查。dense DA 不发送 Top-K index，因此它的通信量应为 `T*d*32` bits/client；只有 Top-K 才支付 `K*(32+ceil(log2 d))` bits/client。后续表格会同时给出原报告的 C0=1.5 dense baseline 与 matched-sensitivity 的 C0=1.0 baseline，避免把中心 DP 的 `2*C0/n` 敏感度差异误报为压缩收益。
+
+当前论文级结论收紧为：在全参与、当前干净聚合 fresh release、状态半径显式有界且真实迭代输出的机制下，理论可先针对 clipped/bounded objective 建立条件式真实迭代界；原始 objective 还需要一个可加和的 clipping-bias 条件或独立 residual feedback。没有这个条件时，不能声称统一 horizon 的无条件 `O(T^(-1/2))` 收敛。
+
+独立的 softmax/simplex checker 还做了一个主动触发投影的 sign-stress：把 Cg、Bh、Be、Br 缩小后，`raw-new` 残差约定下的 c、rho telescoping 误差仍小于 7e-16，而把同一残差误当成 `new-raw` 会产生 1e-1 到 1 量级的误差。实现、报告和紧凑 JSON 分别见 [`tele_scope_softmax_simplex_audit.py`](../repro/tele_scope_softmax_simplex_audit.py)、[`tele_scope_softmax_simplex_audit.md`](../docs/tele_scope_softmax_simplex_audit.md) 与 [`tele_scope_sign_stress.json`](../experiments/tele_scope_sign_stress.json)。
+
+headline driver 现在额外输出 matched-sensitivity dense DA（C0=1.0，与 Top-K 的 `2*Bh/n` 对齐）。在当前三种子设置下，box least-squares 的 test MSE 从历史 dense 6.743 +/- 4.372 降到 3.056 +/- 2.067；softmax objective 从 1.662 +/- 0.177 降到 1.255 +/- 0.088；simplex objective 从 0.7420 +/- 0.0093 降到 0.7383 +/- 0.0194。这些数字只用于暴露敏感度 confound，不能单独归因于 Top-K。
