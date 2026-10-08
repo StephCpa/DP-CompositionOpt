@@ -36,6 +36,13 @@ python repro/run_reproducibility.py horizon \
 python repro/tele_scope_softmax_simplex_audit.py
 
 python repro/generate_sign_stress.py
+
+python repro/audit_telescoping.py \
+  --rounds 40 --seeds 3 \
+  --output experiments/softmax_simplex_telescoping_audit.json
+
+python repro/state_margin_probe.py \
+  --output experiments/state_margin_probe_20261008.json
 ```
 
 For the current flat scratch layout, pass `--code-dir .`; in the repository,
@@ -91,25 +98,35 @@ The horizon driver supports:
    high-epsilon/non-private diagnostic, not a private headline configuration.
 
 The default horizon set is \(T\in\{25,50,100,200\}\).  The optional
-`--gamma-mode noise_calibrated` setting uses
+`--gamma-mode noise_calibrated` setting uses the explicit two-term proxy
 
 \[
-\gamma=\max\{5,\sigma\sqrt{dT}/R_{\mathrm{ref}}\},
+\gamma=\max\{\gamma_{\min},
+  c_\sigma\,\sigma\sqrt{dT}/R_{\mathrm{ref}}\},
 \]
 
-where `--reference-radius` is explicit; the default is the generic box radius
-`Bbox=2.0`, and `1.3` is reserved for reproducing the historical generator-
-informed calibration. The manifest records `reference_radius` and the full
-calibration note.
+where `--noise-coefficient` supplies \(c_\sigma\),
+`--minimum-gamma` supplies \(\gamma_{\min}\), and
+`--reference-radius` supplies \(R_{\mathrm{ref}}\). The default is
+\(c_\sigma=2\), \(\gamma_{\min}=5\), and, for the box task,
+\(R_{\mathrm{ref}}=B_{\mathrm{box}}\sqrt d\), the generic Euclidean
+distance scale from the origin to the box. The coefficient-2 rule is the
+stationary point of the displayed two-term proxy; it is not a claim to
+optimize Paper 3's complete real-iterate theorem. Passing
+`--reference-radius 2.0 --noise-coefficient 1.0` reproduces the earlier
+driver calibration, while `--reference-radius 1.3 --noise-coefficient 1.0`
+reproduces the historical generator-informed setting. The manifest records
+the full calibration parameters and note.
 
 ## Remaining limitations
 
 - The driver reproduces the simulators; it does not turn empirical
   telescoping into a convergence proof.
-- The headline simulator reports the last iterate as the primary metric and
-  now also reports a uniform average of the real iterates. The averaged metrics
-  are included for direct comparison with the averaged-iterate theorem; they do
-  not by themselves prove a convergence rate.
+- The headline simulator reports the uniform average of the real iterates as
+  the primary metric and retains last-iterate scalars for backward
+  compatibility. The averaged metrics are the quantities to compare with the
+  averaged-iterate theorem; they do not by themselves prove a convergence
+  rate.
 - The vector-level algebraic audit now covers box-LS, softmax, and simplex.
   It is available as `repro/audit_telescoping.py` and checks that stored
   cumulative `E_t` equals the signed `c/rho/beta` sum to floating-point
@@ -123,4 +140,15 @@ calibration note.
   `simplex_nonprivate`; `private=False` and \(\sigma=0\) are intentional
   because this experiment tests algebraic residual signs, not privacy.
 - Communication accounting charges dense baselines for values only; Top-K additionally sends indices. The simulators implement that rule. Historical sweep files retain legacy labels and are superseded for theory claims.
+- The current simulator uses `eta=topk_frac` by default. At `delta=0.1`, this
+  is larger than the eta used in Paper 3's EControl proof and fails the simple
+  norm-based ISS check recorded in `docs/p3_Et_closure_lemma_zh.md`. The
+  current runs therefore provide mechanism and diagnostic evidence, not a
+  Paper 3 closure theorem. A theory-aligned rerun must either use the
+  recommended eta explicitly or prove a sharper signed Lyapunov inequality
+  for the current choice.
+- `repro/state_margin_probe.py` records client-level h/e/r margins, the signed
+  e/r projection prefix, the exact telescoping identity, and the overload
+  stress case. It supports the \(B_e=\infty\), \(C_g\ge C_0\) reduction
+  empirically; it does not prove a uniform-in-time bound.
 

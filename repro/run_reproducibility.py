@@ -20,9 +20,11 @@ constructed here and included in the resulting manifest.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib
 import json
 import math
+import platform
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -39,11 +41,43 @@ METHODS = (
 )
 
 
+_BOX_PRIMARY_METRICS = {
+    "objective": "average_objective",
+    "test_mse": "average_test_mse",
+    "train_mse": "average_train_mse",
+    "parameter_mse": "average_parameter_mse",
+    "x_norm": "average_x_norm",
+}
+
+_SOFTMAX_PRIMARY_METRICS = {
+    "objective": "average_objective",
+    "cross_entropy": "average_cross_entropy",
+    "accuracy": "average_accuracy",
+    "W_norm": "average_W_norm",
+}
+
+_SIMPLEX_PRIMARY_METRICS = {
+    "objective": "average_objective",
+    "accuracy": "average_accuracy",
+    "train_objective": "average_train_objective",
+    "parameter_mse": "average_parameter_mse",
+    "w_norm": "average_w_norm",
+}
+
+
 def _find_code_dir(explicit: str | None) -> Path:
     if explicit:
         path = Path(explicit).expanduser().resolve()
         if not path.exists():
             raise FileNotFoundError(f"code directory does not exist: {path}")
+        # Accept both the simulator directory itself and the repository root;
+        # the README uses ``--code-dir .`` from the latter.
+        if not (path / "p3_box_ls_sim.py").exists() and (path / "code" / "p3_box_ls_sim.py").exists():
+            path = path / "code"
+        if not (path / "p3_box_ls_sim.py").exists():
+            raise FileNotFoundError(
+                f"could not find p3_box_ls_sim.py under explicit path: {path}"
+            )
         return path
     here = Path(__file__).resolve()
     candidates = [here.parent.parent / "code", here.parent.parent, Path.cwd() / "code", Path.cwd()]
@@ -60,6 +94,75 @@ def _load_modules(code_dir: Path) -> Dict[str, ModuleType]:
     for name in names:
         modules[name] = importlib.import_module(name)
     return modules
+
+
+def _runtime_metadata(modules: Mapping[str, ModuleType]) -> Dict[str, Any]:
+    """Record enough runtime/source information to audit a manifest.
+
+    The hashes are content hashes, so they do not depend on the absolute
+    checkout path.  They are deliberately metadata only: changing a source
+    file does not alter the numerical algorithm inside this driver.
+    """
+    sources: Dict[str, str] = {}
+    paths = {"repro/run_reproducibility.py": Path(__file__).resolve()}
+    for name, module in modules.items():
+        source = getattr(module, "__file__", None)
+        if source:
+            paths[name] = Path(source).resolve()
+    for name, path in sorted(paths.items()):
+        try:
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:
+            digest = "unavailable"
+        sources[name] = digest
+    return {
+        "python_version": platform.python_version(),
+        "numpy_version": np.__version__,
+        "source_sha256": sources,
+    }
+
+
+def _summary_by_iterate(
+    summary: Mapping[str, Mapping[str, Any]],
+    metric_map: Mapping[str, str],
+    *,
+    iterate: str,
+) -> Dict[str, Dict[str, Any]]:
+    """Project a simulator summary onto a named iterate.
+
+    The simulator's existing scalar keys (``objective``, ``test_mse``, ...)
+    are last-iterate values.  This helper intentionally copies values into a
+    separately named summary instead of replacing those legacy fields.
+    """
+    out: Dict[str, Dict[str, Any]] = {}
+    for method, row in summary.items():
+        item: Dict[str, Any] = {"iterate": iterate}
+        for public_name, stored_name in metric_map.items():
+            if stored_name not in row:
+                continue
+            item[public_name] = row[stored_name]
+            sd_name = f"{stored_name}_sd"
+            if sd_name in row:
+                item[f"{public_name}_sd"] = row[sd_name]
+        out[method] = item
+    return out
+
+
+def _summary_pair(
+    summary: Mapping[str, Mapping[str, Any]],
+    metric_map: Mapping[str, str],
+) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    """Return primary averaged and explicitly labelled legacy summaries."""
+    return {
+        "primary_summary": _summary_by_iterate(
+            summary, metric_map, iterate="uniform_average"
+        ),
+        "legacy_last_iterate_summary": _summary_by_iterate(
+            summary,
+            {public_name: public_name for public_name in metric_map},
+            iterate="last",
+        ),
+    }
 
 
 def _ns(**kwargs: Any) -> SimpleNamespace:
@@ -164,19 +267,35 @@ def _epsilon_for_sigma(
 
 def _calibrated_gamma(
     *, sigma: float, dimension: int, rounds: int, reference_radius: float,
+    noise_coefficient: float = 2.0,
     minimum_gamma: float = 5.0,
 ) -> float:
-    """Return the noise-scaled dual-averaging regularization parameter.
+    """Return the experiment's noise-scaled regularization parameter.
 
-    ``reference_radius`` is an explicit experiment setting.  It represents
-    the radius used to translate an iterate/noise scale into a step-size
-    scale; it is not inferred from a private release and is not a privacy
-    guarantee.  Keeping it explicit avoids silently baking a data-generator
-    constant into the calibration rule.
+    The two-term proxy ``gamma*R^2/(2T) + 2*d*sigma^2/gamma`` has stationary
+    point ``gamma = 2*sigma*sqrt(d*T)/R``.  ``noise_coefficient`` exposes the
+    factor 2 rather than hiding it in the implementation.  This is a
+    calibration rule for the reported experiments, not an assertion that the
+    full real-iterate theorem is optimized by this expression: other terms,
+    including the error-feedback constant and initialization, are not in the
+    proxy.
+
+    ``reference_radius`` is an explicit experiment setting representing an
+    l2 distance scale (for the box task the generic bound is
+    ``Bbox*sqrt(d)``).  It is not inferred from a private release and is not a
+    privacy guarantee.  Keeping it explicit avoids silently baking a
+    data-generator constant into the calibration rule.
     """
     if not np.isfinite(reference_radius) or reference_radius <= 0.0:
         raise ValueError("reference_radius must be a finite positive number")
-    return float(max(minimum_gamma, sigma * math.sqrt(dimension * rounds) / reference_radius))
+    if not np.isfinite(noise_coefficient) or noise_coefficient <= 0.0:
+        raise ValueError("noise_coefficient must be finite and positive")
+    if not np.isfinite(minimum_gamma) or minimum_gamma < 0.0:
+        raise ValueError("minimum_gamma must be finite and nonnegative")
+    return float(max(
+        minimum_gamma,
+        noise_coefficient * sigma * math.sqrt(dimension * rounds) / reference_radius,
+    ))
 
 
 def _mean_sd(rows: Sequence[Mapping[str, Any]], key: str) -> Dict[str, float]:
@@ -189,8 +308,9 @@ def _mean_sd(rows: Sequence[Mapping[str, Any]], key: str) -> Dict[str, float]:
 
 def _summarize_softmax(runs: Mapping[str, List[Mapping[str, Any]]]) -> Dict[str, Dict[str, Any]]:
     metrics = (
-        "objective", "accuracy", "average_objective", "average_accuracy",
-        "average_cross_entropy", "average_W_norm", "sigma", "sensitivity",
+        "objective", "cross_entropy", "accuracy", "W_norm",
+        "average_objective", "average_accuracy", "average_cross_entropy",
+        "average_W_norm", "sigma", "sensitivity",
         "bits_per_client", "accounted_epsilon",
     )
     out: Dict[str, Dict[str, Any]] = {}
@@ -303,6 +423,10 @@ def run_headline(modules: Mapping[str, ModuleType], *, keep_histories: bool = Tr
         simplex_result = {k: v for k, v in simplex_result.items() if k != "runs"}
         soft_runs = {method: [{k: v for k, v in row.items() if k != "history"} for row in rows] for method, rows in soft_runs.items()}
 
+    box_summary = box_result.get("summary", {})
+    simplex_summary = simplex_result.get("summary", {})
+    soft_summary = _summarize_softmax(soft_runs)
+    runtime = _runtime_metadata(modules)
     return {
         "manifest": {
             "driver": "repro/run_reproducibility.py",
@@ -312,11 +436,15 @@ def run_headline(modules: Mapping[str, ModuleType], *, keep_histories: bool = Tr
             "participation_rate": 1.0,
             "release": "clean aggregate plus fresh Gaussian noise",
             "sensitivity": "2*Bh/n for Top-K; 2*C0/n for dense DA",
-            "step_size": "gamma=5.0; last and uniform-average iterates reported",
+            "step_size": "gamma=5.0; uniform-average iterate is primary; last fields retained",
             "iterate_reporting": {
-                "primary": "last",
-                "additional": "uniform_average",
+                "primary": "uniform_average",
+                "legacy": "last",
                 "average_definition": "T^-1 * sum_{t=1}^T post-update real iterates",
+                "legacy_scalar_fields": (
+                    "objective, test_mse, train_mse, parameter_mse, accuracy, "
+                    "and norm fields remain last-iterate values for compatibility"
+                ),
                 "average_metrics_by_task": {
                     "box_ls": [
                         "average_objective", "average_test_mse",
@@ -338,23 +466,35 @@ def run_headline(modules: Mapping[str, ModuleType], *, keep_histories: bool = Tr
             "box_settings": vars(box_args),
             "simplex_settings": vars(simplex_args),
             "softmax_settings": vars(soft_args),
+            "runtime": runtime,
         },
         "box": {
-            "summary": box_result.get("summary"),
+            "summary": box_summary,
+            **_summary_pair(box_summary, _BOX_PRIMARY_METRICS),
             "corrected_diagnostics": box_corrected,
             "average_iterates": box_average_iterates,
             **({"runs": box_result.get("runs")} if keep_histories else {}),
         },
-        "simplex": (
-            simplex_result
-            if keep_histories
-            else {
-                "metadata": simplex_result.get("metadata"),
-                "summary": simplex_result.get("summary"),
-                "average_iterates": simplex_average_iterates,
-            }
-        ),
-        "softmax": {"summary": _summarize_softmax(soft_runs), "runs": soft_runs if keep_histories else {method: [{k: v for k, v in row.items() if k != "history"} for row in rows] for method, rows in soft_runs.items()}},
+        "simplex": {
+            **(
+                simplex_result
+                if keep_histories
+                else {
+                    "metadata": simplex_result.get("metadata"),
+                    "summary": simplex_summary,
+                }
+            ),
+            **_summary_pair(simplex_summary, _SIMPLEX_PRIMARY_METRICS),
+            "average_iterates": simplex_average_iterates,
+        },
+        "softmax": {
+            "summary": soft_summary,
+            **_summary_pair(soft_summary, _SOFTMAX_PRIMARY_METRICS),
+            "runs": soft_runs if keep_histories else {
+                method: [{k: v for k, v in row.items() if k != "history"} for row in rows]
+                for method, rows in soft_runs.items()
+            },
+        },
     }
 
 
@@ -368,15 +508,21 @@ def _run_box_case(
     privacy_interpretation: str | None = None,
 ) -> Dict[str, Any]:
     result = module.run_suite(args)
+    summary = result.get("summary", {})
     payload = {
         "settings": vars(args),
-        "summary": result.get("summary"),
+        "summary": summary,
+        **_summary_pair(summary, _BOX_PRIMARY_METRICS),
         "corrected_diagnostics": _corrected_box_diagnostics(result) if corrected else {},
         "average_iterates": _average_iterate_manifest(result),
         "iterate_reporting": {
-            "primary": "last",
-            "additional": "uniform_average",
+            "primary": "uniform_average",
+            "legacy": "last",
             "average_definition": "T^-1 * sum_{t=1}^T post-update real iterates",
+            "legacy_scalar_fields": (
+                "objective, test_mse, train_mse, parameter_mse, and x_norm "
+                "remain last-iterate values for compatibility"
+            ),
             "average_metrics": [
                 "average_objective", "average_test_mse", "average_train_mse",
                 "average_parameter_mse", "average_x_norm",
@@ -399,6 +545,8 @@ def run_horizon(
     target_sigma: float = 0.6931788020546441,
     gamma_mode: str = "fixed",
     reference_radius: float | None = None,
+    noise_coefficient: float = 2.0,
+    minimum_gamma: float = 5.0,
     keep_histories: bool = False,
 ) -> Dict[str, Any]:
     """Run fixed-total-budget, fixed-sigma, and signed diagnostics.
@@ -413,14 +561,20 @@ def run_horizon(
         "fixed_total", "fixed_sigma", "signed_unclipped", "signed_noprojection"
     )}
     rdp = modules["p3_bounded_sim"]
-    # The default is a generic box-radius scale, not the old generator-specific
-    # 1.3 constant.  Historical runs can be reproduced explicitly with
-    # ``--reference-radius 1.3``.
+    # The default is the generic l2 distance bound for x_0=0 and a box
+    # constraint: Bbox*sqrt(d).  Historical runs can be reproduced explicitly
+    # with ``--reference-radius 2.0 --noise-coefficient 1`` (or with 1.3 for
+    # the old generator-informed scale).
     if reference_radius is None:
-        reference_radius = float(_base_box_args().Bbox)
+        base = _base_box_args()
+        reference_radius = float(base.Bbox * math.sqrt(base.d))
     reference_radius = float(reference_radius)
     if reference_radius <= 0.0 or not np.isfinite(reference_radius):
         raise ValueError("reference_radius must be finite and positive")
+    if not np.isfinite(noise_coefficient) or noise_coefficient <= 0.0:
+        raise ValueError("noise_coefficient must be finite and positive")
+    if not np.isfinite(minimum_gamma) or minimum_gamma < 0.0:
+        raise ValueError("minimum_gamma must be finite and nonnegative")
     for rounds in horizons:
         common: Dict[str, Any] = {"rounds": int(rounds)}
         # Compute the calibrated gamma after determining the relevant sigma.
@@ -430,6 +584,8 @@ def run_horizon(
             total_args.gamma = _calibrated_gamma(
                 sigma=total_sigma, dimension=total_args.d, rounds=rounds,
                 reference_radius=reference_radius,
+                noise_coefficient=noise_coefficient,
+                minimum_gamma=minimum_gamma,
             )
         cases["fixed_total"].append(_run_box_case(modules["p3_box_ls_sim"], total_args, corrected=True, keep_histories=keep_histories))
 
@@ -442,12 +598,15 @@ def run_horizon(
             fixed_args.gamma = _calibrated_gamma(
                 sigma=target_sigma, dimension=fixed_args.d, rounds=rounds,
                 reference_radius=reference_radius,
+                noise_coefficient=noise_coefficient,
+                minimum_gamma=minimum_gamma,
             )
         cases["fixed_sigma"].append(_run_box_case(modules["p3_box_ls_sim"], fixed_args, corrected=True, keep_histories=keep_histories))
 
-        # This is an intentionally unclipped-gradient signed diagnostic:
-        # C0=Cg=100 disables per-example and gradient clipping, while the
-        # h/e/r state projections remain active.
+        # This is an intentionally large-threshold signed diagnostic:
+        # C0=Cg=100 makes clipping unlikely on the tested traces, while the
+        # h/e/r state projections remain active.  The finite thresholds do not
+        # mathematically remove clipping.
         signed_args = _base_box_args(
             rounds=rounds, epsilon=fixed_eps, C0=100.0, Cg=100.0,
         )
@@ -455,6 +614,8 @@ def run_horizon(
             signed_args.gamma = _calibrated_gamma(
                 sigma=target_sigma, dimension=signed_args.d, rounds=rounds,
                 reference_radius=reference_radius,
+                noise_coefficient=noise_coefficient,
+                minimum_gamma=minimum_gamma,
             )
         cases["signed_unclipped"].append(_run_box_case(
             modules["p3_box_ls_signed_sim"], signed_args, corrected=True,
@@ -462,7 +623,7 @@ def run_horizon(
             label=("unclipped-gradient signed diagnostic; h/e/r state "
                    "projections active"),
             privacy_interpretation=("central-DP release with per-example and "
-                                    "gradient clipping disabled; diagnostic only"),
+                                    "gradient thresholds set to 100; diagnostic only"),
         ))
 
         no_projection_args = _base_box_args(
@@ -475,6 +636,8 @@ def run_horizon(
             no_projection_args.gamma = _calibrated_gamma(
                 sigma=target_sigma, dimension=no_projection_args.d, rounds=rounds,
                 reference_radius=reference_radius,
+                noise_coefficient=noise_coefficient,
+                minimum_gamma=minimum_gamma,
             )
         cases["signed_noprojection"].append(_run_box_case(
             modules["p3_box_ls_signed_sim"], no_projection_args, corrected=True,
@@ -492,19 +655,43 @@ def run_horizon(
         "target_sigma": float(target_sigma),
         "gamma_mode": gamma_mode,
         "reference_radius": float(reference_radius),
+        "reference_radius_definition": (
+            "l2 distance scale; default Bbox*sqrt(d) for x0=0 in the box task"
+        ),
+        "noise_coefficient": float(noise_coefficient),
+        "minimum_gamma": float(minimum_gamma),
         "gamma_calibration": (
-            "max(5, sigma*sqrt(d*T)/reference_radius)"
+            "max(minimum_gamma, noise_coefficient*sigma*sqrt(d*T)/reference_radius)"
             if gamma_mode == "noise_calibrated" else "gamma=5.0"
         ),
         "gamma_calibration_note": (
-            "reference_radius is an explicit experiment parameter; the default "
-            "is Bbox=2.0. Pass --reference-radius 1.3 only to reproduce the "
-            "historical generator-informed calibration."
+            "The coefficient-2 rule is the stationary point of the two-term "
+            "proxy gamma*R^2/(2T)+2*d*sigma^2/gamma; it is not claimed to "
+            "optimize the complete real-iterate theorem. The default reference "
+            "radius is Bbox*sqrt(d). Use --noise-coefficient 1 --reference-radius "
+            "2.0 for the previous driver calibration, or --reference-radius 1.3 "
+            "for the older generator-informed calibration."
         ),
+        "calibration_compatibility": {
+            "previous_driver": {
+                "noise_coefficient": 1.0,
+                "reference_radius": 2.0,
+                "command_flags": "--noise-coefficient 1 --reference-radius 2.0",
+            },
+            "historical_generator_informed": {
+                "noise_coefficient": 1.0,
+                "reference_radius": 1.3,
+                "command_flags": "--noise-coefficient 1 --reference-radius 1.3",
+            },
+        },
         "iterate_reporting": {
-            "primary": "last",
-            "additional": "uniform_average",
+            "primary": "uniform_average",
+            "legacy": "last",
             "average_definition": "T^-1 * sum_{t=1}^T post-update real iterates",
+            "legacy_scalar_fields": (
+                "objective, test_mse, train_mse, parameter_mse, and x_norm "
+                "remain last-iterate values for compatibility"
+            ),
             "average_metrics": [
                 "average_objective", "average_test_mse", "average_train_mse",
                 "average_parameter_mse", "average_x_norm",
@@ -512,12 +699,14 @@ def run_horizon(
         },
         "case_labels": {
             "signed_unclipped": (
-                "C0=Cg=100: gradient and per-example clipping disabled; "
-                "h/e/r state projections active"
+                "C0=Cg=100: finite large gradient/per-example clipping thresholds; "
+                "intended as an unclipped-gradient diagnostic, but clipping is "
+                "not mathematically disabled; h/e/r state projections active"
             ),
             "signed_noprojection": (
-                "C0=Cg=Br=Bh=Be=100: all clipping/state projections disabled; "
-                "high-epsilon, effectively non-private diagnostic"
+                "C0=Cg=Br=Be=100 and Bh=10: finite large clipping/state thresholds; "
+                "state projections are not mathematically removed and are only "
+                "empirically inactive on tested traces; high-epsilon diagnostic"
             ),
         },
         "seeds": [0, 1, 2],
@@ -532,6 +721,7 @@ def run_horizon(
             "E_t": "sum_{s<=t}(c_s + rho_s + beta_s), signed vectors",
         },
         "scope_note": "The sweep is a reproducibility diagnostic; it is not a convergence proof.",
+        "runtime": _runtime_metadata(modules),
     }
     if not keep_histories:
         for cases_for_mode in cases.values():
@@ -551,9 +741,20 @@ def main() -> None:
     parser.add_argument("--gamma-mode", choices=("fixed", "noise_calibrated"), default="fixed")
     parser.add_argument(
         "--reference-radius", type=float, default=None,
-        help=("positive radius used by noise_calibrated gamma; default is the "
-              "generic Bbox=2.0 scale. Use 1.3 only to reproduce historical "
-              "generator-informed runs."),
+        help=("positive l2 distance scale used by noise_calibrated gamma; "
+              "default is Bbox*sqrt(d) for the box task. Use 2.0 with "
+              "--noise-coefficient 1 for the previous driver, or 1.3 for "
+              "the historical generator-informed calibration."),
+    )
+    parser.add_argument(
+        "--noise-coefficient", type=float, default=2.0,
+        help=("coefficient multiplying sigma*sqrt(d*T)/reference_radius; "
+              "default 2.0 is the stationary point of the documented two-term "
+              "proxy, while 1.0 reproduces the previous driver."),
+    )
+    parser.add_argument(
+        "--minimum-gamma", type=float, default=5.0,
+        help="nonnegative lower bound for noise_calibrated gamma (default: 5)",
     )
     parser.add_argument("--keep-histories", action="store_true")
     args = parser.parse_args()
@@ -569,6 +770,8 @@ def main() -> None:
             target_sigma=args.target_sigma,
             gamma_mode=args.gamma_mode,
             reference_radius=args.reference_radius,
+            noise_coefficient=args.noise_coefficient,
+            minimum_gamma=args.minimum_gamma,
             keep_histories=args.keep_histories,
         )
     output = Path(args.output)

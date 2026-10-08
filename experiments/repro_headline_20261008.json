@@ -12,10 +12,12 @@
       "participation_rate": 1.0,
       "release": "clean aggregate plus fresh Gaussian noise",
       "sensitivity": "2*Bh/n for Top-K; 2*C0/n for dense DA",
-      "step_size": "gamma=5.0; last and uniform-average iterates reported",
+      "step_size": "gamma=5.0; uniform-average iterate is primary; last fields retained",
       "iterate_reporting": {
-        "primary": "last",
-        "additional": "uniform_average",
+        "primary": "uniform_average",
+        "legacy": "last",
+        "average_definition": "T^-1 * sum_{t=1}^T post-update real iterates",
+        "legacy_scalar_fields": "objective, test_mse, train_mse, parameter_mse, accuracy, and norm fields remain last-iterate values for compatibility",
         "average_metrics_by_task": {
           "box_ls": [
             "average_objective",
@@ -103,6 +105,18 @@
         "seed": 0,
         "accountant": "without_replacement_bound",
         "dense_C0": 1.0
+      },
+      "runtime": {
+        "python_version": "3.12.14",
+        "numpy_version": "2.3.5",
+        "source_sha256": {
+          "p3_bounded_sim": "0070b0ec06a09ac7e6f67db81eab9a23be6ba2367796a02557dc77fc048db671",
+          "p3_box_ls_signed_sim": "1b9b733f230602b4480ca8cf2dc27f0b96fd5b92431f55a1145b238fc76b3bd6",
+          "p3_box_ls_sim": "779db32adbd83c384f772bab40df914b8723b3135e06e576a5121b07f8dfa9dd",
+          "p3_simplex_logistic_sim": "e559a124d3ccccb3195e3ff0de5680d30306315c85cc82a3345990a602469282",
+          "p3_softmax_sim": "c96c6b268cf502c3d7ea50aa0c31c59785ee9d4098f7da92d089349a7f2d5153",
+          "repro/run_reproducibility.py": "12eee15ea61b9bcb2f80a7dcb505070e32cef66a6b650a1e714724f14a92cfdb"
+        }
       }
     },
     "box": {
@@ -326,6 +340,106 @@
           "mean_beta_t_norm_sd": 0.5532067265800501,
           "accounted_epsilon": 8.0,
           "accounted_epsilon_sd": 0.0
+        }
+      },
+      "primary_summary": {
+        "nonprivate_bounded_EControl_TopK": {
+          "iterate": "uniform_average",
+          "objective": 0.02035631968256309,
+          "objective_sd": 0.0008700163831783027,
+          "test_mse": 0.04071263936512618,
+          "test_mse_sd": 0.0017400327663566054,
+          "train_mse": 0.03852154486257101,
+          "train_mse_sd": 0.0008366061972395522,
+          "parameter_mse": 0.001767315422630652,
+          "parameter_mse_sd": 0.00018771725763625508,
+          "x_norm": 1.168230559198301,
+          "x_norm_sd": 0.007163923362112696
+        },
+        "centralDP_bounded_EControl_TopK": {
+          "iterate": "uniform_average",
+          "objective": 0.2522504067115791,
+          "objective_sd": 0.2208970333973323,
+          "test_mse": 0.5045008134231582,
+          "test_mse_sd": 0.4417940667946646,
+          "train_mse": 0.5033107040108925,
+          "train_mse_sd": 0.4814064694210514,
+          "parameter_mse": 0.04773731691518953,
+          "parameter_mse_sd": 0.04386396057478776,
+          "x_norm": 1.4127832209983886,
+          "x_norm_sd": 0.05514342971957037
+        },
+        "centralDP_DA_no_compression": {
+          "iterate": "uniform_average",
+          "objective": 1.1903809528227847,
+          "objective_sd": 1.0338526412759994,
+          "test_mse": 2.3807619056455693,
+          "test_mse_sd": 2.067705282551999,
+          "train_mse": 2.3707510268489376,
+          "train_mse_sd": 2.2422789286162788,
+          "parameter_mse": 0.23417634817938268,
+          "parameter_mse_sd": 0.20594461825587082,
+          "x_norm": 1.985368606536457,
+          "x_norm_sd": 0.2096961416026795
+        },
+        "centralDP_DA_no_compression_matched_sensitivity": {
+          "iterate": "uniform_average",
+          "objective": 0.6106182954711016,
+          "objective_sd": 0.5773473410214796,
+          "test_mse": 1.2212365909422032,
+          "test_mse_sd": 1.154694682042959,
+          "train_mse": 1.2226944105444204,
+          "train_mse_sd": 1.2392511275362008,
+          "parameter_mse": 0.11888765812834368,
+          "parameter_mse_sd": 0.11485427528343783,
+          "x_norm": 1.5595873773020144,
+          "x_norm_sd": 0.06637264168700775
+        }
+      },
+      "legacy_last_iterate_summary": {
+        "nonprivate_bounded_EControl_TopK": {
+          "iterate": "last",
+          "objective": 0.011428218138403131,
+          "objective_sd": 0.00017909604508048343,
+          "test_mse": 0.022856436276806263,
+          "test_mse_sd": 0.00035819209016096687,
+          "train_mse": 0.02186251020760585,
+          "train_mse_sd": 0.0007301784441004756,
+          "parameter_mse": 2.3107196519092944e-05,
+          "parameter_mse_sd": 1.5084731525242852e-05
+        },
+        "centralDP_bounded_EControl_TopK": {
+          "iterate": "last",
+          "objective": 0.7498891400349083,
+          "objective_sd": 0.4435957347536755,
+          "test_mse": 1.4997782800698165,
+          "test_mse_sd": 0.887191469507351,
+          "train_mse": 1.559152343835119,
+          "train_mse_sd": 1.009514895148884,
+          "parameter_mse": 0.14757111831794575,
+          "parameter_mse_sd": 0.09028229496263453
+        },
+        "centralDP_DA_no_compression": {
+          "iterate": "last",
+          "objective": 3.3714829391582106,
+          "objective_sd": 2.1861932054408846,
+          "test_mse": 6.742965878316421,
+          "test_mse_sd": 4.372386410881769,
+          "train_mse": 7.134602980065565,
+          "train_mse_sd": 5.40224958625404,
+          "parameter_mse": 0.6676838453136478,
+          "parameter_mse_sd": 0.43899191550842953
+        },
+        "centralDP_DA_no_compression_matched_sensitivity": {
+          "iterate": "last",
+          "objective": 1.52793806896425,
+          "objective_sd": 1.0335973552345927,
+          "test_mse": 3.0558761379285,
+          "test_mse_sd": 2.0671947104691855,
+          "train_mse": 3.230998092377312,
+          "train_mse_sd": 2.531124821910024,
+          "parameter_mse": 0.3011429215296853,
+          "parameter_mse_sd": 0.2068527381722981
         }
       },
       "corrected_diagnostics": {
@@ -1049,6 +1163,106 @@
           "accounted_epsilon_sd": 0.0
         }
       },
+      "primary_summary": {
+        "nonprivate_bounded_EControl_TopK": {
+          "iterate": "uniform_average",
+          "objective": 0.6705385341472501,
+          "objective_sd": 0.007455052132829761,
+          "accuracy": 0.5869166666666666,
+          "accuracy_sd": 0.009291573243177515,
+          "train_objective": 0.671019436011703,
+          "train_objective_sd": 0.003521164538736921,
+          "parameter_mse": 0.0027058645968535346,
+          "parameter_mse_sd": 0.000496404108697158,
+          "w_norm": 0.4629178900335204,
+          "w_norm_sd": 0.02892930242630025
+        },
+        "centralDP_bounded_EControl_TopK": {
+          "iterate": "uniform_average",
+          "objective": 0.7023002837279831,
+          "objective_sd": 0.004290179063349321,
+          "accuracy": 0.5411666666666667,
+          "accuracy_sd": 0.008889366306623478,
+          "train_objective": 0.7022213177709161,
+          "train_objective_sd": 0.008748108558933917,
+          "parameter_mse": 0.03877936784564264,
+          "parameter_mse_sd": 0.004822069978710369,
+          "w_norm": 0.5279687247145931,
+          "w_norm_sd": 0.06783543292441457
+        },
+        "centralDP_DA_no_compression": {
+          "iterate": "uniform_average",
+          "objective": 0.7085307339569784,
+          "objective_sd": 0.007362995627996321,
+          "accuracy": 0.5376666666666666,
+          "accuracy_sd": 0.0069116447632479395,
+          "train_objective": 0.7097024059199283,
+          "train_objective_sd": 0.017721998861420337,
+          "parameter_mse": 0.045749585050481205,
+          "parameter_mse_sd": 0.006123855297560147,
+          "w_norm": 0.5672131012653564,
+          "w_norm_sd": 0.10348381615482487
+        },
+        "centralDP_DA_no_compression_matched_sensitivity": {
+          "iterate": "uniform_average",
+          "objective": 0.7085557982380303,
+          "objective_sd": 0.006331707353460458,
+          "accuracy": 0.5368333333333334,
+          "accuracy_sd": 0.006246665777303377,
+          "train_objective": 0.7095770353734268,
+          "train_objective_sd": 0.015618071724223347,
+          "parameter_mse": 0.04563581309970386,
+          "parameter_mse_sd": 0.004205120470861389,
+          "w_norm": 0.5679727501355342,
+          "w_norm_sd": 0.09320171219646309
+        }
+      },
+      "legacy_last_iterate_summary": {
+        "nonprivate_bounded_EControl_TopK": {
+          "iterate": "last",
+          "objective": 0.6720924226244535,
+          "objective_sd": 0.010638703066944009,
+          "accuracy": 0.5859166666666668,
+          "accuracy_sd": 0.016129036962364906,
+          "train_objective": 0.671860458970508,
+          "train_objective_sd": 0.0031884644423649426,
+          "parameter_mse": 0.003615607648441977,
+          "parameter_mse_sd": 0.0027363920184869626
+        },
+        "centralDP_bounded_EControl_TopK": {
+          "iterate": "last",
+          "objective": 0.7212402212479944,
+          "objective_sd": 0.02449890393039907,
+          "accuracy": 0.5348333333333334,
+          "accuracy_sd": 0.025135051886426094,
+          "train_objective": 0.7124043997991544,
+          "train_objective_sd": 0.018017967462427713,
+          "parameter_mse": 0.05693669508419463,
+          "parameter_mse_sd": 0.02728882838004887
+        },
+        "centralDP_DA_no_compression": {
+          "iterate": "last",
+          "objective": 0.7420310373196545,
+          "objective_sd": 0.009335220044661738,
+          "accuracy": 0.5246666666666667,
+          "accuracy_sd": 0.01253578211893193,
+          "train_objective": 0.7378930736101493,
+          "train_objective_sd": 0.0125503188469729,
+          "parameter_mse": 0.08062145321960518,
+          "parameter_mse_sd": 0.0067549085452326945
+        },
+        "centralDP_DA_no_compression_matched_sensitivity": {
+          "iterate": "last",
+          "objective": 0.7383490489540291,
+          "objective_sd": 0.019390031797119373,
+          "accuracy": 0.5296666666666666,
+          "accuracy_sd": 0.010619361248838532,
+          "train_objective": 0.7343819373497352,
+          "train_objective_sd": 0.018766135517024742,
+          "parameter_mse": 0.07685904848993103,
+          "parameter_mse_sd": 0.017297935057155208
+        }
+      },
       "average_iterates": {
         "nonprivate_bounded_EControl_TopK": [
           {
@@ -1222,8 +1436,12 @@
           "n_seeds": 3,
           "objective": 0.6284192179651188,
           "objective_sd": 0.018738080605573672,
+          "cross_entropy": 0.6103625367832319,
+          "cross_entropy_sd": 0.01820653222719739,
           "accuracy": 0.7968888888888889,
           "accuracy_sd": 0.013001424423386728,
+          "W_norm": 2.3683340312235206,
+          "W_norm_sd": 0.025834617589995265,
           "average_objective": 0.6807361775336984,
           "average_objective_sd": 0.01740739506920596,
           "average_accuracy": 0.7955555555555556,
@@ -1245,8 +1463,12 @@
           "n_seeds": 3,
           "objective": 1.0790074604273974,
           "objective_sd": 0.13737887828135162,
+          "cross_entropy": 1.038465475069161,
+          "cross_entropy_sd": 0.12677094644761602,
           "accuracy": 0.6229999999999999,
           "accuracy_sd": 0.010598742063723106,
+          "W_norm": 5.506802028044153,
+          "W_norm_sd": 1.6817172126838404,
           "average_objective": 0.9434653925830047,
           "average_objective_sd": 0.045371343132345525,
           "average_accuracy": 0.6045555555555555,
@@ -1268,8 +1490,12 @@
           "n_seeds": 3,
           "objective": 1.661493579713829,
           "objective_sd": 0.1773806050252021,
+          "cross_entropy": 1.6026546804509605,
+          "cross_entropy_sd": 0.1634286344749635,
           "accuracy": 0.5516666666666666,
           "accuracy_sd": 0.011392004993756739,
+          "W_norm": 7.900988567655787,
+          "W_norm_sd": 2.632618147020817,
           "average_objective": 1.3372289222746379,
           "average_objective_sd": 0.1089590126556882,
           "average_accuracy": 0.5027777777777778,
@@ -1291,8 +1517,12 @@
           "n_seeds": 3,
           "objective": 1.2549952882755504,
           "objective_sd": 0.08786463675974948,
+          "cross_entropy": 1.2147406370533698,
+          "cross_entropy_sd": 0.0775020028070884,
           "accuracy": 0.5686666666666667,
           "accuracy_sd": 0.012662279942148337,
+          "W_norm": 5.451539343605417,
+          "W_norm_sd": 1.73095759487545,
           "average_objective": 1.1131183595592724,
           "average_objective_sd": 0.09699753920743114,
           "average_accuracy": 0.5166666666666667,
@@ -1309,6 +1539,98 @@
           "bits_per_client_sd": 0.0,
           "accounted_epsilon": 8.0,
           "accounted_epsilon_sd": 0.0
+        }
+      },
+      "primary_summary": {
+        "nonprivate_bounded_EControl_TopK": {
+          "iterate": "uniform_average",
+          "objective": 0.6807361775336984,
+          "objective_sd": 0.01740739506920596,
+          "cross_entropy": 0.6688712886674836,
+          "cross_entropy_sd": 0.01712754508691058,
+          "accuracy": 0.7955555555555556,
+          "accuracy_sd": 0.014365596763461313,
+          "W_norm": 1.5472574322996555,
+          "W_norm_sd": 0.02340675699917368
+        },
+        "centralDP_bounded_EControl_TopK": {
+          "iterate": "uniform_average",
+          "objective": 0.9434653925830047,
+          "objective_sd": 0.045371343132345525,
+          "cross_entropy": 0.9185098687679482,
+          "cross_entropy_sd": 0.05143031410446151,
+          "accuracy": 0.6045555555555555,
+          "accuracy_sd": 0.036866626481794465,
+          "W_norm": 3.183011821145321,
+          "W_norm_sd": 0.8943469545505853
+        },
+        "centralDP_DA_no_compression": {
+          "iterate": "uniform_average",
+          "objective": 1.3372289222746379,
+          "objective_sd": 0.1089590126556882,
+          "cross_entropy": 1.301112028313837,
+          "cross_entropy_sd": 0.11819468639462273,
+          "accuracy": 0.5027777777777778,
+          "accuracy_sd": 0.07471526196414204,
+          "W_norm": 4.5930359769929625,
+          "W_norm_sd": 1.3430348730936397
+        },
+        "centralDP_DA_no_compression_matched_sensitivity": {
+          "iterate": "uniform_average",
+          "objective": 1.1131183595592724,
+          "objective_sd": 0.09699753920743114,
+          "cross_entropy": 1.0880272302236846,
+          "cross_entropy_sd": 0.10418583313754551,
+          "accuracy": 0.5166666666666667,
+          "accuracy_sd": 0.0691961784429683,
+          "W_norm": 3.1753241297801225,
+          "W_norm_sd": 0.9075459168156976
+        }
+      },
+      "legacy_last_iterate_summary": {
+        "nonprivate_bounded_EControl_TopK": {
+          "iterate": "last",
+          "objective": 0.6284192179651188,
+          "objective_sd": 0.018738080605573672,
+          "cross_entropy": 0.6103625367832319,
+          "cross_entropy_sd": 0.01820653222719739,
+          "accuracy": 0.7968888888888889,
+          "accuracy_sd": 0.013001424423386728,
+          "W_norm": 2.3683340312235206,
+          "W_norm_sd": 0.025834617589995265
+        },
+        "centralDP_bounded_EControl_TopK": {
+          "iterate": "last",
+          "objective": 1.0790074604273974,
+          "objective_sd": 0.13737887828135162,
+          "cross_entropy": 1.038465475069161,
+          "cross_entropy_sd": 0.12677094644761602,
+          "accuracy": 0.6229999999999999,
+          "accuracy_sd": 0.010598742063723106,
+          "W_norm": 5.506802028044153,
+          "W_norm_sd": 1.6817172126838404
+        },
+        "centralDP_DA_no_compression": {
+          "iterate": "last",
+          "objective": 1.661493579713829,
+          "objective_sd": 0.1773806050252021,
+          "cross_entropy": 1.6026546804509605,
+          "cross_entropy_sd": 0.1634286344749635,
+          "accuracy": 0.5516666666666666,
+          "accuracy_sd": 0.011392004993756739,
+          "W_norm": 7.900988567655787,
+          "W_norm_sd": 2.632618147020817
+        },
+        "centralDP_DA_no_compression_matched_sensitivity": {
+          "iterate": "last",
+          "objective": 1.2549952882755504,
+          "objective_sd": 0.08786463675974948,
+          "cross_entropy": 1.2147406370533698,
+          "cross_entropy_sd": 0.0775020028070884,
+          "accuracy": 0.5686666666666667,
+          "accuracy_sd": 0.012662279942148337,
+          "W_norm": 5.451539343605417,
+          "W_norm_sd": 1.73095759487545
         }
       },
       "runs": {

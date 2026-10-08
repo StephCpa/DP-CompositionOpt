@@ -39,7 +39,7 @@ E_t   = sum_{s <= t} (c_s + rho_s + beta_s)
 
 The historical `delta - TopK(delta)` quantity and accumulated projection-norm proxy are retained only as legacy stress diagnostics and are superseded for theory claims. They are not guaranteed conservative because signed terms can cancel or reinforce. Projection residual vectors are stored separately as `raw - new`, with the sign convention documented in `docs/p3_Et_closure_lemma_zh.md`. The remaining utility-proof target is the cumulative e/r projection-residual term `P_T`, not the privacy sensitivity.
 
-The horizon driver uses `signed_unclipped` (the old `signed_clipped` label was misleading because `C0=Cg=100` disables input clipping) and `signed_noprojection` for the high-epsilon/no-state-projection diagnostic. Noise-calibrated gamma uses an explicit `--reference-radius`; the default is the generic `Bbox=2.0`, while `1.3` is reserved for historical reproduction.
+The horizon driver uses `signed_unclipped` (the old `signed_clipped` label was misleading because `C0=Cg=100` disables input clipping) and `signed_noprojection` for the high-epsilon/no-state-projection diagnostic. Noise-calibrated gamma uses explicit `--reference-radius` and `--noise-coefficient`; the default radius is the box task's Euclidean scale `Bbox*sqrt(d)` and the default coefficient is 2.0. Pass `--reference-radius 2.0 --noise-coefficient 1.0` to reproduce the earlier calibration.
 
 The superseded JSONs and their interpretation are listed in
 `docs/LEGACY_DIAGNOSTICS.md`.
@@ -69,10 +69,20 @@ python repro/run_reproducibility.py horizon \
   --gamma-mode noise_calibrated \
   --output experiments/repro_horizon_noise_calibrated.json
 python repro/audit_telescoping.py \
+  --rounds 40 --seeds 3 \
   --output experiments/softmax_simplex_telescoping_audit.json
+python repro/state_margin_probe.py \
+  --output experiments/state_margin_probe_20261008.json
 ```
 
-The manifests record `C0`, `Cg`, `Br`, `Bh`, `Be`, `gamma`, `gamma_mode`, `reference_radius`, seeds, `epsilon`, `delta`, accountant, participation rate, sensitivity, per-round sigma, last/uniform-average iterate metrics, iterate protocol, and bit budget. The independent checker `repro/tele_scope_softmax_simplex_audit.py` reconstructs local updates for softmax and simplex and runs a projection sign stress test.
+The manifests record `C0`, `Cg`, `Br`, `Bh`, `Be`, `gamma`, `gamma_mode`, `reference_radius`, `noise_coefficient`, `minimum_gamma`, seeds, `epsilon`, `delta`, accountant, participation rate, sensitivity, per-round sigma, primary uniform-average metrics, explicitly labelled legacy last-iterate metrics, exact averaged iterates, iterate protocol, and bit budget. The independent checker `repro/tele_scope_softmax_simplex_audit.py` reconstructs local updates for softmax and simplex and runs a projection sign stress test.
+
+The current implementation uses `eta=topk_frac` by default. At the headline
+compression ratio `delta=0.1`, this is not the eta recommended by Paper 3's
+EControl proof and does not satisfy the simple norm ISS condition in the
+closure note. The next theory experiment must either set Paper 3's eta
+explicitly or prove a sharper signed Lyapunov inequality for the current
+choice.
 
 Representative checks already run include Python compilation, finite-difference gradient checks, simplex feasibility checks, three-seed runs for softmax+ℓ1, box least squares, and simplex logistic regression, fixed-total-privacy and fixed-per-round-sigma horizon sweeps, signed projection-residual diagnostics, and matched-sensitivity baselines.
 

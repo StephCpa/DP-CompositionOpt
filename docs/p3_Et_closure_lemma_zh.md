@@ -6,7 +6,9 @@
 >
 > 当前明确排除：带噪差分的服务器端二次积分、最终未压缩上传、虚拟迭代作为最终理论对象、固定大小客户端抽样的主定理、原始无界 EControl 状态的时间无关敏感度。
 
-当前主线的单轮敏感度已经闭合：固定发布历史后，显式投影给出 `S_h=2B_h/n`；剩余未闭合项是效用证明中的 `E_t`，尤其是 e/r 投影残差累计量 `P_T`，而不是隐私敏感度。
+> **参数审计警告（2026-10-08）：** 当前模拟器默认 `eta=topk_frac=delta`，而 Paper 3 的 EControl 证明使用 `eta=delta/[3 sqrt(1-delta)(1+sqrt(1-delta))]`。因此本文中引用 Paper 3 收缩的地方都必须把该参数条件显式列出；现有默认实验只能作为经验诊断，不能直接宣称满足 Paper 3 的 EControl 闭合条件。
+
+当前主线的单轮敏感度已经闭合：固定发布历史后，显式 h 投影给出 `S_h=2B_h/n`；剩余未闭合项是效用证明中的 `E_t`。在当前代码的更新顺序下，clipped-objective 的精确约化只涉及 e 投影的带符号运行和；r 在 `C_g>=C_0` 时恒为零，h 残差不单独进入该恒等式。
 
 ---
 
@@ -130,6 +132,21 @@ y_t=\Delta_t+z_t,
 
 因为那会让 DP 噪声形成随机游走，再被 Dual Averaging 累积一次。那种机制的 DP 方差会出现近似 `T^3` 的二次累积项，不能套用下面的闭合式。
 
+### 2.4 代码实现的索引和初始化（必须保留）
+
+代码从 `h_{i,-1}=0,e_{i,0}=0,r_{i,0}=0` 开始。因而第一轮的
+
+\[
+\delta_{i,0}=u_{i,0},
+\]
+
+而不是 Paper 3 Algorithm 4 中通过预先设置
+`\hat g_{i,-1}=g_{i,0}` 得到的 `\delta_{i,0}=0`。这只是一个启动瞬态，但不能在引用 Paper 3 Lemma 4.1 时省略；任何稳定性常数都必须额外包含 `\|u_{i,0}\|`（或一般的 `\|\delta_{i,0}\|`）项。
+
+当前代码的更新顺序是：先生成 `h_{i,t}`，再用这个更新后的状态生成
+`e_{i,t+1}`，最后把 `h_{i,t}` 聚合并发布。因此下文的恒等式使用
+`h_{i,t}` 而不是 `h_{i,t-1}`。
+
 ### 2.3 Top-K 收缩
 
 令 `delta=k/d`。确定性 Top-K 满足
@@ -208,6 +225,85 @@ DP 噪声 `z_t` 进入有效 oracle 方差：
 \]
 
 而不是同时进入 `E_t`。把 `z_t` 同时放进随机 oracle 项和累计误差项会重复计算 DP 噪声。
+
+### 3.1 一个可直接证明的主线约化
+
+当前实现有一个比一般 `EF-1` 更强的代数约化。记客户端级投影残差采用代码中的
+`raw - new` 符号：
+
+\[
+p^e_{i,t+1}
+:=\bar e_{i,t}+h_{i,t}-u_{i,t}-e_{i,t+1}.
+\]
+
+因为 `e_{i,t}` 每轮都已经位于 `B_e` 球内，所以再次调用
+`clip_{B_e}(e_{i,t})` 不会改变它，即 `\bar e_{i,t}=e_{i,t}`。由代码更新式逐点得到
+
+\[
+h_{i,t}-u_{i,t}
+=e_{i,t+1}-e_{i,t}+p^e_{i,t+1}.
+\tag{E-telescope-local}
+\]
+
+这里没有使用 h 投影为零；h 投影只改变 `h_{i,t}`，而 `e_{i,t+1}` 使用的正是这个已经投影后的状态。对客户端取平均并求和，得到精确恒等式
+
+\[
+\sum_{s=0}^{t-1}c_s
+=\bar e_t-\bar e_0+\sum_{s=0}^{t-1}\bar p^e_{s+1},
+\qquad \bar e_t:=\frac1n\sum_i e_{i,t}.
+\tag{E-telescope}
+\]
+
+初始化为 `e_{i,0}=0` 时，若令
+
+\[
+S_t^e:=\sum_{s=0}^{t-1}\bar p^e_{s+1},
+\]
+
+则
+
+\[
+\sum_{s<t}c_s=\bar e_t+S_t^e.
+\tag{E-cumulative}
+\]
+
+该恒等式比把 h/e/r 的逐轮残差平方相加更精确。它说明：
+
+- `B_e=\infty` 时 `p^e_{i,t}=0`，所以累计 `c` **恰好等于** `\bar e_t`；
+- 即使 h 投影发生，h 残差也不单独出现在该恒等式中；
+- 有限 `B_e` 时，真正需要控制的是带符号的运行和 `S_t^e`，不是
+  `\sum_s\|p^e_s\|` 的局部平方和；
+- `S_t^e=O(T)` 或 `\sum_s\|p^e_s\|^2=O(T)` 都不足以推出
+  `Q_T=O(T)`。一个直接充分条件是 `\sup_{t\le T}\mathbb E\|S_t^e\|^2\le K_S`
+  （独立于 T），再加上 `\sum_t\mathbb E\|\bar e_t\|^2=O(T)`。
+
+更具体地，有限 `B_e` 时状态截断本身给出
+`\|\bar e_t\|\le B_e`，从而
+
+\[
+\mathbb E\|E_t^{\rm clip}\|^2
+\le 2B_e^2+2\mathbb E\|S_t^e\|^2.
+\]
+
+因此 `\sup_t\mathbb E\|S_t^e\|^2=O(1)` 已足以推出 clipped-objective 的
+`Q_T=O(T)`；不需要把每轮 e 残差的平方和要求为 `O(T)`。但这个带符号运行和界仍需证明，
+而显式 `B_e=\infty` 的版本则把问题简化为直接控制 `\bar e_t`。
+
+如果 `C_g\ge C_0`，则 `r_{i,0}=0` 时有一个同样确定性的约化。每个 `v_{i,t}` 是范数不超过
+`C_0` 的样本裁剪向量的平均值，故 `\|v_{i,t}\|\le C_0\le C_g`；归纳得到
+
+\[
+r_{i,t}=0,\qquad u_{i,t}=v_{i,t},\qquad \rho_t=0,
+\tag{r-zero}
+\]
+
+对所有 t 成立。主线的 `C_g=C_0=1.5` 满足这个条件。于是，若同时取 `B_e=\infty`，则 clipped-objective 的累计误差满足
+
+\[
+E_t^{\rm clip}=\bar e_t
+\]
+
+（按本文件的 `E_t` 索引约定，忽略 clipping bias `\beta`）。这不是经验拟合，而是代码更新式的逐轮代数事实。
 
 记
 
@@ -394,6 +490,102 @@ K_DD_t+K_PP_t+K_\Xi\Xi_t.
 
 因此，Paper 3 无投影 EControl 的收缩引理不能直接作为 `EF-1` 的证明。需要先在投影残差为零的特例中恢复原有收缩结构，再逐一加回三个投影残差。
 
+### 5.4 无投影特例中的确定性输入到状态稳定性
+
+在某一个客户端上，暂时假设 h 投影和 e 投影都没有激活，并令
+`\chi=\sqrt{1-\delta}`。代码的实际符号约定给出
+
+\[
+\begin{aligned}
+e_{t+1}&=q_t-\delta_t+(1-\eta)e_t,\\
+\delta_{t+1}&=(1+\eta)(\delta_t-q_t)+\eta^2e_t+(u_{t+1}-u_t),
+\end{aligned}
+\tag{EC-rec}
+\]
+
+其中 `q_t=TopK(\delta_t)`，`\|q_t-\delta_t\|\le\chi\|\delta_t\|`。因此令
+`a_t=\|e_t\|`、`b_t=\|\delta_t\|`、`d_t=\|u_{t+1}-u_t\|`，有
+
+\[
+\begin{bmatrix}a_{t+1}\\b_{t+1}\end{bmatrix}
+\le
+M_\delta
+\begin{bmatrix}a_t\\b_t\end{bmatrix}
+ +\begin{bmatrix}0\\d_t\end{bmatrix},
+\quad
+M_\delta:={\begin{bmatrix}
+|1-\eta|&\chi\\
+\eta^2&(1+\eta)\chi
+\end{bmatrix}}.
+\tag{EC-matrix}
+\]
+
+这给出一个可以严格使用的、但带参数条件的确定性稳定性结论：如果
+`\rho(M_\delta)<1`，则对任意 `q` 满足 `\rho(M_\delta)<q<1`，存在有限
+`K_\delta(q)` 使
+
+\[
+\sup_{t\le T}\|e_t\|
+\le
+K_\delta(q)\left(\|[e_0,\delta_0]\|+\frac{\sup_{s<T}d_s}{1-q}\right).
+\tag{EC-ISS}
+\]
+
+更具体地，取任意诱导范数并令
+`\|M_\delta^j\|\le K_\delta(q)q^j`，上式就是一个显式但通常偏松的界。
+其中 `\|[e_0,\delta_0]\|` 表示把两个状态拼接后的向量范数。
+Paper 3 的推荐
+
+\[
+\eta=\frac{\delta}{3\sqrt{1-\delta}(1+\sqrt{1-\delta})}
+\]
+
+在当前 Top-K 比例 `\delta=0.1` 下满足该条件（矩阵谱半径约为 `0.9932`）。但是，当前
+模拟器的默认代码是 `eta = topk_frac = delta`，不是上面的 Paper 3 推荐值；当
+`delta=0.1, eta=0.1` 时，同一 `M_delta` 的谱半径约为 `1.0928`，因此这个确定性
+ISS 证明**不能**认证当前默认配置。若保持 `eta=delta`，必须另证更精细的带符号
+Lyapunov 收缩；若要使用本节的 ISS 路径，应在实验配置中显式采用 Paper 3 的 `eta`
+或重新选择满足 `rho(M_delta)<1` 的 `eta`。这不是对所有
+`delta\in(0,1)` 的自动结论；如果 `\rho(M_\delta)\ge1`，必须降低 `\eta` 或回到
+Paper 3 的平方和收缩分析。由于代码的启动状态为 `\delta_0=u_0`，稳定性界必须保留
+`\|u_0\|` 项。Paper 3 Lemma 4.1 的 `\delta_0=0` 版本不能直接套用。
+
+该结果只适用于 h/e 投影尚未激活的路径。它本身不证明“投影永远不激活”。要完成无投影归纳，必须在同一事件上验证每个客户端的逐点 margin：
+
+\[
+\sup_t\|h_{i,t-1}+q_{i,t}\|<B_h,
+\qquad
+\sup_t\|e_{i,t}+h_{i,t}-u_{i,t}\|<B_e
+\tag{margin}
+\]
+
+对所有 i，而不是只验证聚合量 `\|H_t\|` 或平均状态。单个客户端可以越界而聚合后相互抵消；因此聚合 h 的界不能替代客户端级 pathwise margin。
+
+对高斯发布，`d_t` 不是确定性常数。可以先在事件
+`\mathcal Z_R=\{\max_{t<T}\|z_t\|\le R\}` 上进行条件分析，再对该事件取概率。对盒约束 prox 且固定 `\gamma`，非扩张性给出
+
+\[
+\|x_{t+1}-x_t\|\le \frac{\|H_t+z_t\|}{\gamma}
+\le \frac{B_h+R}{\gamma}
+\quad\text{on }\mathcal Z_R.
+\]
+
+例如，对独立的 `z_t\sim\mathcal N(0,\sigma_{\mathrm{DP},t}^2I_d)` 且
+`\sigma_{\mathrm{DP},t}\le\bar\sigma`，一个简单的联合事件选择是
+
+\[
+R_\alpha=\bar\sigma\left(\sqrt d+\sqrt{2\log(T/\alpha)}\right),
+\qquad
+\Pr(\mathcal Z_{R_\alpha})\ge1-\alpha,
+\]
+
+其中第二个不等式来自逐轮 Gaussian norm tail 加 union bound。这个 `R_\alpha` 会随
+`\sqrt{\log T}` 增长；因此它只能给出高概率、有限 horizon 的 margin 条件，不能伪装成
+一个与 T 无关的 pathwise 界。
+
+若每个客户端的 clipped gradient 是 `L_i`-Lipschitz，则输入 movement 还需加上随机批次变化项，并可在该事件上取
+`d_t\le L_i(B_h+R)/\gamma+\xi_{i,t}`。高斯尾界只能给出高概率 margin；它不能把该结论变成无条件的确定性定理。对 l1 复合项或变化的 `\gamma_t`，上述简单 prox movement 界还需要额外的正则项和步骤尺度分析，不能直接照搬盒约束公式。
+
 ---
 
 ## 6. movement 耦合接口
@@ -554,7 +746,10 @@ K_P=\kappa_DK_p+\kappa_P.
 2. `MC-1` 成立；
 3. `Absorb` 成立；
 4. `sum_t Xi_t <= K_Xi T`；
-5. `sum_t P_t <= K_P0 T`；
+5. 不能仅以 `sum_t P_t <= K_P0 T` 作为累计误差闭合条件。对当前实现，需控制带符号的
+   e 投影运行和 `S_t^e`；一个直接充分条件是
+   `sup_{t\le T} E||S_t^e||^2 <= K_S`，并另行控制
+   `sum_t E||\bar e_t||^2`；
 6. `mathcal R_T <= K_R T`；
 7. `mathcal B_T <= K_B T`；
 8. `V_T <= K_V T`，其中
@@ -610,6 +805,44 @@ Q_T=\sum_{t=1}^{T}\mathbb E\|E_t\|^2
 \]
 
 如果 `gamma=c sqrt(T)`，且 `K_E`、`mathcal V_T/T`、`mathcal R_T/T`、`mathcal B_T/T` 均在所讨论的 horizon 范围内有界，则可以得到形式上的 `O(T^{-1/2})` 界。这个结论仍然是条件式的，因为 `Closure` 和 `EF-1` 尚未完成证明。
+
+### 7.3 主线的简化闭合条件
+
+在实验主线常用的条件
+
+\[
+C_g\ge C_0,\qquad B_e=\infty
+\]
+
+下，上一节的恒等式和 `r-zero` 给出
+
+\[
+\rho_t=0,
+\qquad
+E_t^{\rm clip}=\bar e_t.
+\]
+
+因此不需要把 h 投影残差或 r 投影残差放入 clipped-objective 的 `P_T`。此时，一个比一般 `EF-1` 更直接的充分条件是：
+
+1. 对每个客户端，h 投影在所考虑的路径上从未激活（满足客户端级 `h` margin）；
+2. 无投影递推满足 `\rho(M_\delta)<1`，并在同一事件上有
+   `\sup_t\|u_{i,t+1}-u_{i,t}\|` 的有限界。注意当前默认
+   `eta=topk_frac=delta` 在 `delta=0.1` 时不满足这个矩阵条件；这一步需要显式改用
+   Paper 3 的 `eta`，或另证适用于 `eta=delta` 的收缩；
+3. 由 `EC-ISS` 得到 `\sup_t\|e_{i,t}\|\le K_e`，其中 `K_e` 与 T 无关；
+4. clipping bias 另行满足 `\mathcal B_T=O(T)`（若只认证 clipped objective，则令 `\beta_t=0`）；
+5. DP 高斯噪声和 stochastic-oracle 变化在一个明确声明的高概率事件上满足 movement 条件。
+
+在这些条件下，逐点有 `\|\bar e_t\|\le K_e`，从而
+
+\[
+Q_T^{\rm clip}
+=\sum_{t=1}^{T}\mathbb E\|\bar e_t\|^2
+\le K_e^2T
+\]
+
+（若只在 `\mathcal Z_R` 上成立，则这是条件事件内的界，并需加上事件外的尾部贡献）。这条路径比原先把所有投影残差平方相加的 `EF-1` 更窄，也更贴合当前代码。它仍然不是无条件定理，因为 `EC-ISS` 的谱半径条件、客户端级 margin 和高概率噪声事件尚未在三个任务上统一证明。
+
 
 ---
 
@@ -677,7 +910,7 @@ K_E(T)=O(T)
 3. EControl 跟踪能量和原始目标的 clipping bias 可能增大；
 4. 真实 DA 迭代又受到更大的 DP oracle 方差影响。
 
-这些机制支持报告 privacy-limited utility knee，但不能用旧 proxy 证明 clipped-objective 的理论误差超线性。按 signed decomposition 重算后，no-projection 高 epsilon/non-private 诊断的 clipped-objective `Q_T/T` 为 `3.06,2.49,2.37,2.18`，呈平坦或下降趋势；原始目标的偏差仍须通过 `beta_t` 单独报告。固定总预算的主线结论应同时给出 `gamma_protocol`、last/averaged iterate、每轮 `sigma_t` 和 signed `P_T`，而不是只报告旧表中的 `Q_T/T`。
+这些机制支持报告 privacy-limited utility knee，但不能用旧 proxy 证明 clipped-objective 的理论误差超线性。按 signed decomposition 重算后，no-projection 高 epsilon/non-private 诊断的 clipped-objective `Q_T/T` 为 `3.06,2.49,2.37,2.18`，呈平坦或下降趋势；原始目标的偏差仍须通过 `beta_t` 单独报告。固定总预算的主线结论应同时给出 `gamma_protocol`、last/averaged iterate、每轮 `sigma_t` 和 signed `S_t^e`（以及作为诊断的局部 `P_t`），而不是只报告旧表中的 `Q_T/T`。
 
 这些数值结果是对闭合引理的压力测试，不是 `EF-1` 的证明。论文中应报告 `sigma_t`、`D_t`、`P_t`、`M_t`、`mathfrak C_t`、`mathfrak R_t`、`mathfrak B_t` 和 `Q_T/T`，而不是只报告最终目标函数。
 
@@ -747,7 +980,7 @@ K_E(T)=O(T)
 \mathcal B_T=0,
 \]
 
-闭合只需处理 EControl 跟踪、movement、局部随机变化和投影残差。若 `EF-1`、`MC-1`、`Absorb` 以及 `mathcal V_T, mathcal P_T, mathcal R_T, mathcal N_T=O(T)` 成立，则可以候选地推出
+闭合只需处理 EControl 跟踪、movement、局部随机变化和投影残差。若 `EF-1`、`MC-1`、`Absorb` 以及 `mathcal V_T, mathcal R_T, mathcal N_T=O(T)` 成立，并且 e 投影的带符号运行和满足上一节的有界条件，则可以候选地推出
 
 \[
 Q_T\le K_E T.
@@ -801,7 +1034,7 @@ Q_T\le K_E T.
 - `MC-1` 的局部输入变化到 movement 的不等式；
 - `DA-1` 在当前有界投影机制和真实迭代下的完整常数核对；
 - `Absorb` 对 movement 反馈的吸收条件；
-- 在 `V_T=O(T)`、`mathcal P_T=O(T)`、`mathcal B_T=O(T)` 下的 `Q_T<=K_E T`；固定 `sigma` 只能帮助前一项，不能替代 `mathcal B_T=O(T)`；
+- 在 `V_T=O(T)`、有界 e 投影运行和 `mathcal B_T=O(T)` 下的 `Q_T<=K_E T`；固定 `sigma` 只能帮助前一项，不能替代 `mathcal B_T=O(T)`；
 - `gamma`、`eta`、`B_h,B_e,B_r,C_g` 的统一可行参数区间。
 
 ### 10.3 必须验证的内容

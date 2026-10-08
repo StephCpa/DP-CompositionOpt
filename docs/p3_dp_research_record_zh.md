@@ -689,13 +689,18 @@ E_t    = sum_{s <= t} (c_s + rho_s + beta_s)
 | 100 | 2.37 | 18.3 |
 | 200 | 2.18 | 29.4 |
 
-修正后的量是平坦或下降的；它不支持“无 clipping、无投影时 \(Q_T/T\) 仍持续增长”的旧结论。该结果也不等于收敛证明：它只说明此前的增长主要由错误的 norm proxy 和配置标签造成。真正需要证明的是，在有界主线中投影残差累计量
+修正后的量是平坦或下降的；它不支持“无 clipping、无投影时 \(Q_T/T\) 仍持续增长”的旧结论。该结果也不等于收敛证明：它只说明此前的增长主要由错误的 norm proxy 和配置标签造成。真正需要证明的是，在有界主线中带符号的 e 投影运行和
 
 \[
-P_T=\sum_{t\le T}\|\bar p^e_t\|+\sum_{t\le T}\|\bar p^r_t\|
+S_T^e=\sum_{s\le T}\bar p^e_s,
 \]
 
-是否为 \(O(T)\)（更强时为 \(O(1)\)），以及它如何进入 Paper 3 的真实迭代不等式。无投影诊断只能验证 \(P_T=0\) 的特例。
+是否在二阶意义下保持 \(\sup_{t\le T}\mathbb E\|S_t^e\|^2=O(1)\)，以及它如何进入 Paper 3 的真实迭代不等式。对一般有限半径实验，局部投影量
+\(P_t=\frac1n\sum_i\mathbb E(\|p^h_{i,t}\|^2+\|p^e_{i,t}\|^2+\|p^r_{i,t}\|^2)\)
+仍可作为 movement 诊断，但 \(\sum_tP_t=O(T)\) 本身不足以推出 \(Q_T=O(T)\)。无投影诊断只能验证 \(S_T^e=0\) 的特例。
+
+对当前代码还可以进一步缩小目标：若 \(C_g\ge C_0\) 且 \(r_{i,0}=0\)，则 \(r_{i,t}=0\)、\(u_{i,t}=v_{i,t}\)、\(\rho_t=0\) 对所有轮次成立；若另取 \(B_e=\infty\)，则有精确恒等式
+\(E_t^{\mathrm{clip}}=\bar e_t\)，不需要把 h 或 r 投影残差放入 clipped-objective 的累计误差。此时剩余证明入口是客户端级 h 投影 margin 与无投影 EControl 的输入到状态稳定性条件。
 
 历史摘要 `box_signed_noprojection_sweep_summary.json` 已标为 legacy/superseded；当前 horizon manifest 记录目标/实际 \(\varepsilon\)、每轮 sigma、`C0/Cg`、投影半径、`reference_radius`、`gamma_mode` 和 `iterate_reporting`，而零噪声 sign-stress manifest 单独记录 `sigma_override=0`。这样可避免把该诊断误读成私有训练结果。
 
@@ -722,7 +727,11 @@ E_t   = sum_{s <= t} (c_s + rho_s + beta_s)
 
 旧版 box horizon sweep 中 `Q_T/T` 的大幅增长主要来自错误的 norm proxy。按理论 signed decomposition 重新计算时，headline 主配置的 clipped objective `Q_T/T` 约为 0.2 的量级；no-projection 诊断则为 3.06→2.18，平坦或下降。原始 least-squares 目标仍显示明显的 clipping bias，这一偏差不能由“每步有界”自动变成 `O(T)` 的累计能量。旧 sweep JSON 只作 legacy 复现线索，不再作为理论证据。
 
-同时，旧版 utility knee 不能直接作为方法不稳定的证据：它只使用固定 gamma=5 和 last iterate，而理论草案分析的是 averaged iterate 与随 horizon 调整的正则化尺度。当前 driver 已支持 `--gamma-mode noise_calibrated`、显式 `--reference-radius`（默认使用通用 `Bbox=2.0`，历史复现才传 1.3）以及 uniform-average 指标；新版 manifest 记录 `gamma_mode`、`reference_radius`、`iterate_reporting`、每轮 sigma、C0/Cg/Bh/Be/Br、seeds、accountant 和总 bit budget。
+同时，旧版 utility knee 不能直接作为方法不稳定的证据：它只使用固定 gamma=5 和 last iterate，而理论草案分析的是 averaged iterate 与随 horizon 调整的正则化尺度。当前 driver 已支持 `--gamma-mode noise_calibrated`、显式 `--reference-radius`（默认使用 box 约束的欧氏距离尺度 `Bbox*sqrt(d)`）和显式 `--noise-coefficient`（默认 2.0；历史复现才传 1.0），以及把 uniform-average 指标作为 headline primary。新版 manifest 记录 `gamma_mode`、`reference_radius`、`noise_coefficient`、`iterate_reporting`、每轮 sigma、C0/Cg/Bh/Be/Br、seeds、accountant 和总 bit budget。
+
+新的 `repro/state_margin_probe.py` 直接包装 Box-LS 模拟器并逐客户端记录 raw/projected 状态。三 seed 主线压力测试显示：`B_e=2` 时 h raw 最大范数约 0.728、e raw 最大范数约 2.174，有限 e 投影是唯一非零的 signed residual；改为 `B_e=inf` 不改变 sigma 或敏感度，且 `E_t^{clip}=mean(e_t)` 的误差约为 1e-15。`C_0=0.5<B_h=1` 的 full-coordinate margin 配置没有观察到 h/e/r 投影；而固定输入范数 2、`B_h=1` 的控制压力测试使 e 以斜率约 1 线性增长。这些结果支持把 `S_t^e` 与客户端级 h margin 作为下一步证明对象，但不构成无条件稳定性定理。
+
+还发现当前实现的 `eta=topk_frac` 与 Paper 3 的推荐 EControl eta 不同。对 `delta=0.1`，Paper 3 的推荐值约为 0.018，而代码默认 eta=0.1；简单的绝对值递推矩阵在后者下谱半径约为 1.0928，因而不能用该 ISS 路线认证当前默认配置。后续必须显式使用 Paper 3 eta，或为 eta=delta 建立更精细的带符号 Lyapunov 收缩证明。这个参数缺口独立于 DP 噪声和投影 margin，不能被数值上没有触发投影替代。
 
 基线也已按相同敏感度重新核查。dense DA 不发送 Top-K index，因此它的通信量应为 `T*d*32` bits/client；只有 Top-K 才支付 `K*(32+ceil(log2 d))` bits/client。后续表格会同时给出原报告的 C0=1.5 dense baseline 与 matched-sensitivity 的 C0=1.0 baseline，避免把中心 DP 的 `2*C0/n` 敏感度差异误报为压缩收益。
 
