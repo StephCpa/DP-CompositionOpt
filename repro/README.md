@@ -186,8 +186,16 @@ That file tests projection-residual signs and is not a DP result.
 The audit is an algebraic implementation check. It does not establish a
 convergence theorem, privacy bound, or sensitivity result.
 
-The calibration regression checks can be run without generating artifacts:
+The calibration and residual-buffer regression checks can be run without
+generating artifacts:
 
 ```bash
 python repro/test_calibration.py -v
+python repro/test_residual_invariant.py -v
 ```
+
+`test_residual_invariant.py` (about 2 seconds) guards the `r-zero` invariant
+from the closure note: with `r_0 = 0` and `Cg >= C0`, the residual buffer stays
+exactly zero (so `u = v`) in the box-LS, simplex and softmax simulators. It also
+runs a `Cg = 0.1` control that must activate the buffer, so a zero result cannot
+pass vacuously.
