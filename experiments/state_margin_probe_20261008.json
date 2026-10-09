@@ -21,7 +21,8 @@
       "gamma": 6.931788020546441
     },
     "infinity_encoding": "Be=inf is represented as the string 'inf' in configuration metadata; all numeric output fields are finite.",
-    "overload_note": "Controlled nonprivate stress test with deterministic constant input norm 2 > Bh=1; not a private-data claim."
+    "overload_note": "Controlled nonprivate stress test with deterministic constant input norm 2 > Bh=1; not a private-data claim.",
+    "dense_cases_note": "dense_no_activation_clipping_control and dense_overload_linear_e_stress use topk_frac=1 and eta=1 (no compression); they are dense controls, not Top-K margin tests. Renamed from no_activation_margin_C0_less_Bh and overload_constant_input_norm2_Bh1."
   },
   "checks": {
     "all_serialized_numeric_values_finite": {
@@ -43,7 +44,7 @@
       "max_e_projection": 0.0,
       "max_r_projection": 0.0
     },
-    "C0_less_Bh_no_projection_observed": {
+    "dense_control_C0_less_Bh_no_projection_observed": {
       "passed": true,
       "C0": 0.5,
       "Bh": 1.0
@@ -56,9 +57,9 @@
       ],
       "scope": "empirical finite-seed observation, not a theorem"
     },
-    "overload_e_growth_is_linear": {
+    "dense_overload_e_growth_is_linear": {
       "passed": true,
-      "slope": 1.0,
+      "slope": 1.0000000000000002,
       "r2": 1.0,
       "final_e_norm": 40.0
     }
@@ -332,7 +333,7 @@
       "no_e_projection_observed_all_seeds": false,
       "no_r_projection_observed_all_seeds": true
     },
-    "no_activation_margin_C0_less_Bh": {
+    "dense_no_activation_clipping_control": {
       "n_seeds": 3,
       "config": {
         "rounds": 100,
@@ -399,7 +400,7 @@
       "no_e_projection_observed_all_seeds": true,
       "no_r_projection_observed_all_seeds": true
     },
-    "overload_constant_input_norm2_Bh1": {
+    "dense_overload_linear_e_stress": {
       "n_seeds": 3,
       "config": {
         "rounds": 40,
@@ -117872,7 +117873,7 @@
         }
       }
     ],
-    "no_activation_margin_C0_less_Bh": [
+    "dense_no_activation_clipping_control": [
       {
         "objective": 1.6269177300234863,
         "test_mse": 3.2538354600469725,
@@ -127637,7 +127638,7 @@
             }
           ]
         },
-        "case": "no_activation_margin_C0_less_Bh",
+        "case": "dense_no_activation_clipping_control",
         "config": {
           "rounds": 100,
           "d": 10,
@@ -137420,7 +137421,7 @@
             }
           ]
         },
-        "case": "no_activation_margin_C0_less_Bh",
+        "case": "dense_no_activation_clipping_control",
         "config": {
           "rounds": 100,
           "d": 10,
@@ -147203,7 +147204,7 @@
             }
           ]
         },
-        "case": "no_activation_margin_C0_less_Bh",
+        "case": "dense_no_activation_clipping_control",
         "config": {
           "rounds": 100,
           "d": 10,
@@ -147223,7 +147224,7 @@
         }
       }
     ],
-    "overload_constant_input_norm2_Bh1": [
+    "dense_overload_linear_e_stress": [
       {
         "objective": 2.265040667361248,
         "test_mse": 4.530081334722496,
@@ -149719,7 +149720,7 @@
             }
           ]
         },
-        "case": "overload_constant_input_norm2_Bh1",
+        "case": "dense_overload_linear_e_stress",
         "config": {
           "rounds": 40,
           "d": 1,
@@ -152233,7 +152234,7 @@
             }
           ]
         },
-        "case": "overload_constant_input_norm2_Bh1",
+        "case": "dense_overload_linear_e_stress",
         "config": {
           "rounds": 40,
           "d": 1,
@@ -154747,7 +154748,7 @@
             }
           ]
         },
-        "case": "overload_constant_input_norm2_Bh1",
+        "case": "dense_overload_linear_e_stress",
         "config": {
           "rounds": 40,
           "d": 1,

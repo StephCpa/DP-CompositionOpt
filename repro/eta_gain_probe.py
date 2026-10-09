@@ -251,7 +251,10 @@ def _projected_run(u_seq: np.ndarray, eta: float, k: int, Bh: float, project: bo
         e = e + h_new - u
         h = h_new
         me = max(me, float(np.linalg.norm(e)))
-    return {"sup_e": me, "h_projection_active_fraction": active / len(u_seq)}
+    # With project=False nothing is projected; the same count is then the
+    # counterfactual rate at which the projection would have triggered.
+    key = "h_projection_active_fraction" if project else "would_project_fraction"
+    return {"sup_e": me, key: active / len(u_seq)}
 
 
 def part_projection(etas: Sequence[float], d: int = 10, k: int = 1, T: int = 20000,
@@ -307,12 +310,17 @@ def main() -> None:
             "box_ls_fields": {
                 "max_fields": "max_* and longest_unselected_run are maxima over clients, rounds AND seeds (not seed means)",
                 "max_track": "max of ||h_raw - u|| (h_raw before projection)",
-                "track_over_du": "max_track / max ||u_t - u_{t-1}|| (t >= 1): effective tracking gain on real inputs",
+                "track_over_du": "ratio of two maxima, max_track / max ||u_t - u_{t-1}|| (t >= 1); not a max of pointwise ratios and not an induced gain",
                 "longest_unselected_run": "longest run of consecutive rounds one coordinate of one client was not in the Top-K support",
                 "consistency": "max deviation between the recorder's reconstruction and the simulator's own h/e update (should be 0)",
                 "E_clip_minus_mean_e_inf": "identity check: with B_e=inf and Cg>=C0, sum(c+rho) equals mean(e_T)",
             },
             "projection_setting": {"d": 10, "k": 1, "T": 20000, "Bh": 1.0, "u_radius": 0.95, "Be": "inf"},
+            "projection_fields": {
+                "h_projection_active_fraction": "projected runs: fraction of rounds in which the B_h projection was applied",
+                "would_project_fraction": "unprojected runs: fraction of rounds with ||h_raw|| > B_h, i.e. where the projection would have triggered; nothing is projected",
+                "sup_e_comparison": "the effect of projection on sup||e|| is non-monotonic across these traces; compare projected and unprojected rows individually",
+            },
             "numpy": np.__version__,
             "python": platform.python_version(),
         },

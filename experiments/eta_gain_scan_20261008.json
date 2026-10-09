@@ -37,7 +37,7 @@
     "box_ls_fields": {
       "max_fields": "max_* and longest_unselected_run are maxima over clients, rounds AND seeds (not seed means)",
       "max_track": "max of ||h_raw - u|| (h_raw before projection)",
-      "track_over_du": "max_track / max ||u_t - u_{t-1}|| (t >= 1): effective tracking gain on real inputs",
+      "track_over_du": "ratio of two maxima, max_track / max ||u_t - u_{t-1}|| (t >= 1); not a max of pointwise ratios and not an induced gain",
       "longest_unselected_run": "longest run of consecutive rounds one coordinate of one client was not in the Top-K support",
       "consistency": "max deviation between the recorder's reconstruction and the simulator's own h/e update (should be 0)",
       "E_clip_minus_mean_e_inf": "identity check: with B_e=inf and Cg>=C0, sum(c+rho) equals mean(e_T)"
@@ -49,6 +49,11 @@
       "Bh": 1.0,
       "u_radius": 0.95,
       "Be": "inf"
+    },
+    "projection_fields": {
+      "h_projection_active_fraction": "projected runs: fraction of rounds in which the B_h projection was applied",
+      "would_project_fraction": "unprojected runs: fraction of rounds with ||h_raw|| > B_h, i.e. where the projection would have triggered; nothing is projected",
+      "sup_e_comparison": "the effect of projection on sup||e|| is non-monotonic across these traces; compare projected and unprojected rows individually"
     },
     "numpy": "2.5.3",
     "python": "3.13.16"
@@ -993,7 +998,7 @@
       },
       "unprojected": {
         "sup_e": 1.8704515469981509,
-        "h_projection_active_fraction": 0.00425
+        "would_project_fraction": 0.00425
       }
     },
     {
@@ -1006,7 +1011,7 @@
       },
       "unprojected": {
         "sup_e": 2.8489606286403073,
-        "h_projection_active_fraction": 0.04535
+        "would_project_fraction": 0.04535
       }
     },
     {
@@ -1019,7 +1024,7 @@
       },
       "unprojected": {
         "sup_e": 1.8759529373610313,
-        "h_projection_active_fraction": 0.0005
+        "would_project_fraction": 0.0005
       }
     },
     {
@@ -1032,7 +1037,7 @@
       },
       "unprojected": {
         "sup_e": 2.1022072608515243,
-        "h_projection_active_fraction": 0.0
+        "would_project_fraction": 0.0
       }
     },
     {
@@ -1045,7 +1050,7 @@
       },
       "unprojected": {
         "sup_e": 4.094382777924984,
-        "h_projection_active_fraction": 0.7961
+        "would_project_fraction": 0.7961
       }
     },
     {
@@ -1058,7 +1063,7 @@
       },
       "unprojected": {
         "sup_e": 5.395188087291583,
-        "h_projection_active_fraction": 0.10015
+        "would_project_fraction": 0.10015
       }
     },
     {
@@ -1071,7 +1076,7 @@
       },
       "unprojected": {
         "sup_e": 2.6368606682784628,
-        "h_projection_active_fraction": 0.1273
+        "would_project_fraction": 0.1273
       }
     },
     {
@@ -1084,7 +1089,7 @@
       },
       "unprojected": {
         "sup_e": 2.8948261272381046,
-        "h_projection_active_fraction": 0.07795
+        "would_project_fraction": 0.07795
       }
     },
     {
@@ -1097,7 +1102,7 @@
       },
       "unprojected": {
         "sup_e": 6.582052902741321,
-        "h_projection_active_fraction": 0.4641
+        "would_project_fraction": 0.4641
       }
     },
     {
@@ -1110,7 +1115,7 @@
       },
       "unprojected": {
         "sup_e": 12.14556658230863,
-        "h_projection_active_fraction": 0.15675
+        "would_project_fraction": 0.15675
       }
     },
     {
@@ -1123,7 +1128,7 @@
       },
       "unprojected": {
         "sup_e": 4.057289355221952,
-        "h_projection_active_fraction": 0.5179
+        "would_project_fraction": 0.5179
       }
     },
     {
@@ -1136,7 +1141,7 @@
       },
       "unprojected": {
         "sup_e": 7.8652426734560725,
-        "h_projection_active_fraction": 0.3471
+        "would_project_fraction": 0.3471
       }
     }
   ]

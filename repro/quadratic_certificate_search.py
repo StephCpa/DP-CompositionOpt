@@ -189,7 +189,7 @@ def min_certified_rho(eta: float, kappa: float, sector: bool, *, lo: float = 0.9
     """Bisection for the smallest rho at which the search finds a verified certificate."""
     best: Optional[Tuple[float, np.ndarray]] = None
     if _find_certificate(eta, kappa, hi, sector, restarts, iters, seed) is None:
-        return {"found": False, "searched_interval": [lo, hi]}
+        return {"found": False, "stable_contraction_certified": False, "searched_interval": [lo, hi]}
     for _ in range(steps):
         mid = 0.5 * (lo + hi)
         z = _find_certificate(eta, kappa, mid, sector, restarts, iters, seed)
@@ -201,8 +201,11 @@ def min_certified_rho(eta: float, kappa: float, sector: bool, *, lo: float = 0.9
         best = (hi, _find_certificate(eta, kappa, hi, sector, restarts, iters, seed))
     rho, z = best
     ok, lmax = _verify(z, eta, kappa, rho, sector)
-    return {"found": True, "rho": rho, "rho_uncertified_below": lo, "verified": ok,
-            "max_eigenvalue": lmax, "params": [float(v) for v in z]}
+    # ``found`` only means a verified certificate exists for SOME rho in the
+    # searched interval; contraction (stability) needs rho < 1.
+    return {"found": True, "stable_contraction_certified": bool(ok and rho < 1.0), "rho": rho,
+            "rho_uncertified_below": lo, "verified": ok, "max_eigenvalue": lmax,
+            "params": [float(v) for v in z]}
 
 
 def certified_gains(eta: float, kappa: float, rhos: Sequence[float], *, restarts: int = 4,
@@ -325,6 +328,7 @@ def run(kappa: float, etas: Sequence[float]) -> Dict[str, Any]:
             "sector_constraint": "<p, (h_raw-u) - p> >= 0 for the h-ball projection residual p; valid when ||u_t|| <= B_h",
             "search": "deterministic Nelder-Mead over block-scalar P and S-procedure multipliers; bisection on rho (12 steps in [0.9, 1.2])",
             "certificate_validity": "every reported certificate is re-verified: P > 0, multipliers >= 0, max eigenvalue < -1e-9 (rho search) or <= 1e-9 * matrix scale after a 1e-7 relative margin on c (gain certificate)",
+            "found_vs_stable": "found=true means a verified certificate exists for some rho in [0.9, 1.2]; only stable_contraction_certified=true (verified and rho < 1) certifies contraction",
             "not_found_meaning": "the heuristic search found no certificate; this is NOT a proof that none exists and NOT evidence of instability",
             "numpy": np.__version__,
             "python": platform.python_version(),

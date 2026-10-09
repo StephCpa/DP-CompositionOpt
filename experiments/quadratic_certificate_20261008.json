@@ -17,6 +17,7 @@
     "sector_constraint": "<p, (h_raw-u) - p> >= 0 for the h-ball projection residual p; valid when ||u_t|| <= B_h",
     "search": "deterministic Nelder-Mead over block-scalar P and S-procedure multipliers; bisection on rho (12 steps in [0.9, 1.2])",
     "certificate_validity": "every reported certificate is re-verified: P > 0, multipliers >= 0, max eigenvalue < -1e-9 (rho search) or <= 1e-9 * matrix scale after a 1e-7 relative margin on c (gain certificate)",
+    "found_vs_stable": "found=true means a verified certificate exists for some rho in [0.9, 1.2]; only stable_contraction_certified=true (verified and rho < 1) certifies contraction",
     "not_found_meaning": "the heuristic search found no certificate; this is NOT a proof that none exists and NOT evidence of instability",
     "numpy": "2.5.3",
     "python": "3.13.16"
@@ -33,6 +34,7 @@
       },
       "quadratic": {
         "found": true,
+        "stable_contraction_certified": false,
         "rho": 1.039892578125,
         "rho_uncertified_below": 1.0398193359374999,
         "verified": true,
@@ -46,6 +48,7 @@
       },
       "quadratic_sector": {
         "found": true,
+        "stable_contraction_certified": false,
         "rho": 1.1078613281249998,
         "rho_uncertified_below": 1.1077880859375,
         "verified": true,
@@ -71,6 +74,7 @@
       },
       "quadratic": {
         "found": true,
+        "stable_contraction_certified": true,
         "rho": 0.9963134765625001,
         "rho_uncertified_below": 0.9962402343750002,
         "verified": true,
@@ -84,6 +88,7 @@
       },
       "quadratic_sector": {
         "found": true,
+        "stable_contraction_certified": false,
         "rho": 1.1250732421875,
         "rho_uncertified_below": 1.125,
         "verified": true,
@@ -134,6 +139,7 @@
       },
       "quadratic": {
         "found": true,
+        "stable_contraction_certified": true,
         "rho": 0.9810791015625,
         "rho_uncertified_below": 0.9810058593750001,
         "verified": true,
@@ -147,6 +153,7 @@
       },
       "quadratic_sector": {
         "found": true,
+        "stable_contraction_certified": false,
         "rho": 1.0922607421875,
         "rho_uncertified_below": 1.0921874999999999,
         "verified": true,
@@ -197,6 +204,7 @@
       },
       "quadratic": {
         "found": true,
+        "stable_contraction_certified": true,
         "rho": 0.9846679687500002,
         "rho_uncertified_below": 0.9845947265625001,
         "verified": true,
@@ -210,6 +218,7 @@
       },
       "quadratic_sector": {
         "found": true,
+        "stable_contraction_certified": false,
         "rho": 1.0877197265624998,
         "rho_uncertified_below": 1.087646484375,
         "verified": true,
@@ -260,6 +269,7 @@
       },
       "quadratic": {
         "found": true,
+        "stable_contraction_certified": true,
         "rho": 0.9886962890625002,
         "rho_uncertified_below": 0.9886230468750001,
         "verified": true,
@@ -273,6 +283,7 @@
       },
       "quadratic_sector": {
         "found": true,
+        "stable_contraction_certified": false,
         "rho": 1.02041015625,
         "rho_uncertified_below": 1.0203369140625,
         "verified": true,

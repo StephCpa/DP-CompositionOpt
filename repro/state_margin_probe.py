@@ -397,9 +397,10 @@ def _run_all(box: Any, seeds: Iterable[int]) -> Dict[str, Any]:
         "headline_gamma5_BeInf": _base_config(box, Be=float("inf")),
         "old_calibration_radius2_factor1": _base_config(box, gamma=old_gamma),
         "corrected_geometry_radius_Bbox_sqrt_d_factor2": _base_config(box, gamma=corrected_gamma),
-        # With full coordinates sent and Cg=C0<Bh, h follows u and the
-        # margin is intentionally explicit. This is an empirical check.
-        "no_activation_margin_C0_less_Bh": _base_config(
+        # Dense control (topk_frac=1, eta=1): with every coordinate sent and
+        # Cg=C0<Bh, h follows u.  This is a clipping control, NOT a Top-K
+        # margin test.
+        "dense_no_activation_clipping_control": _base_config(
             box, topk_frac=1.0, eta=1.0, C0=0.5, Cg=0.5, Be=float("inf"), Br=2.0,
         ),
     }
@@ -413,8 +414,8 @@ def _run_all(box: Any, seeds: Iterable[int]) -> Dict[str, Any]:
     )
     overload_rows = []
     for seed in seeds:
-        overload_rows.append(_run_case(box, "overload_constant_input_norm2_Bh1", overload_cfg, seed, override_input=np.asarray([2.0])))
-    cases["overload_constant_input_norm2_Bh1"] = overload_rows
+        overload_rows.append(_run_case(box, "dense_overload_linear_e_stress", overload_cfg, seed, override_input=np.asarray([2.0])))
+    cases["dense_overload_linear_e_stress"] = overload_rows
 
     checks: Dict[str, Any] = {}
     finite_rows = all(_finite(row) for rows in cases.values() for row in rows)
@@ -437,8 +438,8 @@ def _run_all(box: Any, seeds: Iterable[int]) -> Dict[str, Any]:
         "max_e_projection": float(inf_probe["max_e_projection_mean_norm"]),
         "max_r_projection": float(inf_probe["max_r_projection_mean_norm"]),
     }
-    margin_rows = cases["no_activation_margin_C0_less_Bh"]
-    checks["C0_less_Bh_no_projection_observed"] = {
+    margin_rows = cases["dense_no_activation_clipping_control"]
+    checks["dense_control_C0_less_Bh_no_projection_observed"] = {
         "passed": bool(all(row["state_margin_probe"]["no_h_projection_observed"] and row["state_margin_probe"]["no_e_projection_observed"] for row in margin_rows)),
         "C0": 0.5, "Bh": 1.0,
     }
@@ -455,7 +456,7 @@ def _run_all(box: Any, seeds: Iterable[int]) -> Dict[str, Any]:
         "cases": calibrated_names,
         "scope": "empirical finite-seed observation, not a theorem",
     }
-    overload = cases["overload_constant_input_norm2_Bh1"][0]["state_margin_probe"]
+    overload = cases["dense_overload_linear_e_stress"][0]["state_margin_probe"]
     e_series = np.asarray([r["max_e_norm"] for r in overload["per_round"]], dtype=float)
     rounds = np.arange(1, len(e_series) + 1, dtype=float)
     slope, intercept = np.polyfit(rounds, e_series, 1)
@@ -463,7 +464,7 @@ def _run_all(box: Any, seeds: Iterable[int]) -> Dict[str, Any]:
     ss_res = float(np.sum((e_series - fitted) ** 2))
     ss_tot = float(np.sum((e_series - np.mean(e_series)) ** 2))
     r2 = 1.0 if ss_tot == 0.0 else 1.0 - ss_res / ss_tot
-    checks["overload_e_growth_is_linear"] = {
+    checks["dense_overload_e_growth_is_linear"] = {
         "passed": bool(slope > 0.5 and r2 > 0.99),
         "slope": float(slope), "r2": float(r2), "final_e_norm": float(e_series[-1]),
     }
@@ -481,6 +482,7 @@ def _run_all(box: Any, seeds: Iterable[int]) -> Dict[str, Any]:
             "corrected_geometry": {"reference_radius": float(corrected_radius), "factor": 2.0, "gamma": float(corrected_gamma)},
             "infinity_encoding": "Be=inf is represented as the string 'inf' in configuration metadata; all numeric output fields are finite.",
             "overload_note": "Controlled nonprivate stress test with deterministic constant input norm 2 > Bh=1; not a private-data claim.",
+            "dense_cases_note": "dense_no_activation_clipping_control and dense_overload_linear_e_stress use topk_frac=1 and eta=1 (no compression); they are dense controls, not Top-K margin tests. Renamed from no_activation_margin_C0_less_Bh and overload_constant_input_norm2_Bh1.",
         },
         "checks": checks,
         "summary": summaries,

@@ -146,9 +146,12 @@ the full calibration parameters and note.
   current runs therefore provide mechanism and diagnostic evidence, not a
   Paper 3 closure theorem. A theory-aligned rerun must either use the
   recommended eta explicitly or prove a sharper signed Lyapunov inequality
-  for the current choice.
+  for the current choice. `docs/p3_eta_stability_audit_zh.md` records that
+  smaller eta does not improve box-LS utility and enlarges the e-state.
 - `repro/state_margin_probe.py` records client-level h/e/r margins, the signed
-  e/r projection prefix, the exact telescoping identity, and the overload
-  stress case. It supports the \(B_e=\infty\), \(C_g\ge C_0\) reduction
+  e/r projection prefix, the exact telescoping identity, and two dense control
+  cases, `dense_no_activation_clipping_control` and
+  `dense_overload_linear_e_stress` (both `topk_frac=1`, `eta=1`; they are not
+  Top-K margin tests). It supports the \(B_e=\infty\), \(C_g\ge C_0\) reduction
   empirically; it does not prove a uniform-in-time bound.
 
