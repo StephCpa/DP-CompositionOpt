@@ -740,3 +740,17 @@ E_t   = sum_{s <= t} (c_s + rho_s + beta_s)
 独立的 softmax/simplex checker 还做了一个主动触发投影的 sign-stress：把 Cg、Bh、Be、Br 缩小后，`raw-new` 残差约定下的 c、rho telescoping 误差仍小于 7e-16，而把同一残差误当成 `new-raw` 会产生 1e-1 到 1 量级的误差。实现、报告和紧凑 JSON 分别见 [`tele_scope_softmax_simplex_audit.py`](../repro/tele_scope_softmax_simplex_audit.py)、[`tele_scope_softmax_simplex_audit.md`](../docs/tele_scope_softmax_simplex_audit.md) 与 [`tele_scope_sign_stress.json`](../experiments/tele_scope_sign_stress.json)。
 
 headline driver 现在额外输出 matched-sensitivity dense DA（C0=1.0，与 Top-K 的 `2*Bh/n` 对齐）。在当前三种子设置下，box least-squares 的 test MSE 从历史 dense 6.743 +/- 4.372 降到 3.056 +/- 2.067；softmax objective 从 1.662 +/- 0.177 降到 1.255 +/- 0.088；simplex objective 从 0.7420 +/- 0.0093 降到 0.7383 +/- 0.0194。这些数字只用于暴露敏感度 confound，不能单独归因于 Top-K。
+
+
+### 8.15 外部评审更正（External Review Corrections，2026-10-09）
+
+本节记录外部评审对早期研究评估中若干表述的更正。它来源于外部评审，不是本仓库的新实验。依据的已提交产物为 [`repro_headline_20261008.json`](../experiments/repro_headline_20261008.json)、`repro_horizon_*_20261008.json`、[`state_margin_probe_20261008.json`](../experiments/state_margin_probe_20261008.json)、[`eta_gain_scan_20261008.json`](../experiments/eta_gain_scan_20261008.json)、[`quadratic_certificate_20261008.json`](../experiments/quadratic_certificate_20261008.json) 与 [`tele_scope_sign_stress.json`](../experiments/tele_scope_sign_stress.json)。下列数字都是三种子诊断（均值 ± 样本标准差），不是统计显著性检验，也不是跨任务的普遍结论。
+
+1. 早期评估中 softmax matched-dense 的准确率 0.5687 是最后迭代指标，不是平均迭代指标；平均迭代准确率约为 0.5167 ± 0.069。
+2. 按平均迭代指标：softmax 的目标值差距明确（DP-TopK 0.9435 ± 0.045，matched dense 1.113 ± 0.097）；simplex 两组结果大致持平（准确率 0.5412 ± 0.0089 对 0.5368 ± 0.0062，目标值 0.7023 ± 0.0043 对 0.7086 ± 0.0063）；box-LS 种子间离散很大，两组区间大幅重叠（test MSE 0.505 ± 0.442 对 1.221 ± 1.155）。因此"压缩保留一定效用优势"只能谨慎地就 softmax 的三种子结果表述，不能推广到三个任务。
+3. 新校准规则降低而不是提高 gamma：在 box-LS、固定总 epsilon=8、T=100 时，gamma 由旧规则的约 10.96 降到约 6.93，平均迭代 MSE 由约 0.282 变为约 0.344。
+4. 早期评估引用的 0.34–0.42（以及 `eta_gain_scan` 中按种子取最大的 0.38–0.47）是输入变化 `||u_t - u_{t-1}||`，不是 DA 迭代移动 `||x_t - x_{t-1}||`。
+5. 在 Paper 3 的 eta 下，二次证书常数低于 EC-matrix 路线：e-增益约 3071 → 1481，h-增益约 111 → 41.5；但两者仍远高于有限轨迹的经验值。
+6. sign-stress 的 telescoping 误差应写作约 7e-16 以下，而不是统一低于 1e-16。
+7. 外部评审曾认为 `C_g >= C_0` 不能推出 `u = v`，复核后撤回。在当前代码中，`r_{i,0} = 0` 且 `||v_{i,t}|| <= C_0 <= C_g`（`v` 是逐样本按 `C_0` 裁剪后的平均）时，归纳可得 `r ≡ 0`、`u = v`；三个模拟器结构相同，数值核对 `max ||r|| = 0`。但主线 `C_0 = C_g = 1.5 > B_h = 1`，这一不变性不能推出 h 扇区条件 `||u_t|| <= B_h`；还需要 `C_0 <= B_h`，或直接取 `C_g <= B_h`。
+8. 以上更正不改变当前工程结论：保留 `eta = 0.1` 作为默认实验值，以 Top-K 专用的跟踪界作为主要未解决理论问题。8.14 节"后续必须显式使用 Paper 3 eta"一句应结合 [`p3_eta_stability_audit_zh.md`](p3_eta_stability_audit_zh.md) 理解：较小的 eta 在 box-LS 上不改善效用，并增大 e 状态与 clipped-objective 误差能量。
